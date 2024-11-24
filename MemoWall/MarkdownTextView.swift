@@ -117,13 +117,28 @@ struct MarkdownTextView: NSViewRepresentable {
                 // 重置该行的字体
                 storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: lineRange)
                 
-                // 处理标题样式
-                if trimmedLine.hasPrefix("# ") && !trimmedLine.hasPrefix("## ") {
-                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 28, weight: .bold), range: lineRange)
-                } else if trimmedLine.hasPrefix("## ") && !trimmedLine.hasPrefix("### ") {
-                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 22, weight: .bold), range: lineRange)
-                } else if trimmedLine.hasPrefix("### ") {
-                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 18, weight: .semibold), range: lineRange)
+                // 检查是否包含 todo 标记（包括已转换和未转换的）
+                let hasTodo = line.contains(Coordinator.CHECKBOX_UNCHECKED) || 
+                             line.contains(Coordinator.CHECKBOX_CHECKED)
+                
+                // 移除 todo 标记后检查标题样式
+                var lineForHeadingCheck = line
+                if hasTodo {
+                    lineForHeadingCheck = line.replacingOccurrences(of: Coordinator.CHECKBOX_UNCHECKED, with: "")
+                                             .replacingOccurrences(of: Coordinator.CHECKBOX_CHECKED, with: "")
+                }
+                let trimmedLineForHeading = lineForHeadingCheck.trimmingCharacters(in: .whitespaces)
+                
+                // 应用标题样式
+                if trimmedLineForHeading.hasPrefix("# ") && !trimmedLineForHeading.hasPrefix("## ") {
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 28, weight: .bold), 
+                                       range: lineRange)
+                } else if trimmedLineForHeading.hasPrefix("## ") && !trimmedLineForHeading.hasPrefix("### ") {
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 22, weight: .bold), 
+                                       range: lineRange)
+                } else if trimmedLineForHeading.hasPrefix("### ") {
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 18, weight: .semibold), 
+                                       range: lineRange)
                 }
                 
                 currentLocation = NSMaxRange(lineRange)
