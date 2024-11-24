@@ -14,6 +14,6 @@ struct MemoWallApp: App {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
+        .defaultSize(width: 800, height: 600)
     }
 }

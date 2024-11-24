@@ -2,9 +2,10 @@
 //  ContentView.swift
 //  MemoWall
 //
-//  Created by Diyan Gao on 11/14/24.
+//  Created by Diyan Gao on 11/23/24.
 //
 
+import Foundation
 import SwiftUI
 
 struct ContentView: View {
@@ -12,11 +13,6 @@ struct ContentView: View {
     
     var body: some View {
         MarkdownTextView(text: $text)
-            .frame(minWidth: 300, minHeight: 400)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-}
-
-// Preview
-#Preview {
-    ContentView()
 }

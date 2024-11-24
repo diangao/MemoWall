@@ -61,8 +61,8 @@ struct MarkdownTextView: NSViewRepresentable {
     
     class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MarkdownTextView
-        private static let CHECKBOX_UNCHECKED = "☐"
-        private static let CHECKBOX_CHECKED = "☑"
+        static let CHECKBOX_UNCHECKED = "☐"
+        static let CHECKBOX_CHECKED = "☑"
         
         init(_ parent: MarkdownTextView) {
             self.parent = parent
@@ -75,42 +75,46 @@ struct MarkdownTextView: NSViewRepresentable {
         
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            parent.text = textView.string
+            
+            // 保存当前光标位置
+            let selectedRange = textView.selectedRange()
             
             let currentLineRange = getCurrentLineRange(textView)
             let currentLine = (textView.string as NSString).substring(with: currentLineRange)
             
-            if currentLine.trimmingCharacters(in: .whitespaces).hasPrefix("[] ") {
+            // 只在完整输入 "[] " 后处理一次
+            if currentLine == "[] " {
                 handleTodoInput(textView, lineRange: currentLineRange)
+                
+                // 恢复光标位置到正确的位置（checkbox后面）
+                let newPosition = currentLineRange.location + 3  // checkbox(1) + space(1) + 光标位置(1)
+                textView.setSelectedRange(NSRange(location: newPosition, length: 0))
+            } else {
+                parent.text = textView.string
+                applyMarkdownStyling(textView)
+                
+                // 恢复原始光标位置
+                textView.setSelectedRange(selectedRange)
             }
-            
-            applyMarkdownStyling(textView)
         }
         
         private func handleTodoInput(_ textView: NSTextView, lineRange: NSRange) {
             let storage = textView.textStorage!
-            let currentLine = (textView.string as NSString).substring(with: lineRange)
             
-            // 检查是否是待办事项
-            if let range = currentLine.range(of: "[] ") {
-                // 计算 [] 在原始行中的位置
-                let startIndex = currentLine.distance(from: currentLine.startIndex, to: range.lowerBound)
-                let checkboxRange = NSRange(location: lineRange.location + startIndex, length: 2)
-                
-                // 保存原始属性
-                let attributes = storage.attributes(at: lineRange.location, effectiveRange: nil)
-                
-                // 替换 [] 为复选框
-                storage.replaceCharacters(in: checkboxRange, with: Coordinator.CHECKBOX_UNCHECKED)
-                
-                // 恢复原始属性
-                let newRange = NSRange(location: lineRange.location, length: currentLine.count)
-                storage.setAttributes(attributes, range: newRange)
-                
-                // 单独设置复选框的字体
-                let checkboxCharRange = NSRange(location: lineRange.location + startIndex, length: 1)
-                storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: checkboxCharRange)
-            }
+            storage.beginEditing()
+            
+            // 替换 "[]" 为 checkbox
+            let checkboxRange = NSRange(location: lineRange.location, length: 2)
+            storage.replaceCharacters(in: checkboxRange, with: Coordinator.CHECKBOX_UNCHECKED)
+            
+            // 添加点击属性
+            let clickableRange = NSRange(location: lineRange.location, length: 1)
+            storage.addAttribute(.cursor, value: NSCursor.pointingHand, range: clickableRange)
+            
+            storage.endEditing()
+            
+            // 更新父视图的文本
+            parent.text = textView.string
         }
         
         private func applyMarkdownStyling(_ textView: NSTextView) {
@@ -129,20 +133,38 @@ struct MarkdownTextView: NSViewRepresentable {
                 // 设置默认字体
                 storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: lineRange)
                 
-                // 如果是待办事项行，跳过标题样式处理
+                // 首先检查是否是待办事项
                 if trimmedLine.hasPrefix(Coordinator.CHECKBOX_UNCHECKED) || 
                    trimmedLine.hasPrefix(Coordinator.CHECKBOX_CHECKED) {
+                    // 为复选框添加点击手势
+                    if let checkboxRange = line.range(of: Coordinator.CHECKBOX_UNCHECKED) ?? 
+                                         line.range(of: Coordinator.CHECKBOX_CHECKED) {
+                        let startIndex = line.distance(from: line.startIndex, to: checkboxRange.lowerBound)
+                        let clickableRange = NSRange(location: lineRange.location + startIndex, length: 1)
+                        storage.addAttribute(.cursor, value: NSCursor.pointingHand, range: clickableRange)
+                    }
+                    
+                    // 如果是已完成的待办事项，添加删除线
+                    if trimmedLine.hasPrefix(Coordinator.CHECKBOX_CHECKED) {
+                        storage.addAttribute(.strikethroughStyle, 
+                                           value: NSUnderlineStyle.single.rawValue, 
+                                           range: lineRange)
+                    }
+                    
                     currentLocation = NSMaxRange(lineRange)
-                    continue
+                    continue  // 跳过标题样式处理
                 }
                 
-                // 应用标题样式
+                // 处理标题样式
                 if trimmedLine.hasPrefix("# ") && !trimmedLine.hasPrefix("## ") {
-                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 28, weight: .bold), range: lineRange)
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 28, weight: .bold), 
+                                       range: lineRange)
                 } else if trimmedLine.hasPrefix("## ") && !trimmedLine.hasPrefix("### ") {
-                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 22, weight: .bold), range: lineRange)
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 22, weight: .bold), 
+                                       range: lineRange)
                 } else if trimmedLine.hasPrefix("### ") {
-                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 18, weight: .semibold), range: lineRange)
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 18, weight: .semibold), 
+                                       range: lineRange)
                 }
                 
                 currentLocation = NSMaxRange(lineRange)
@@ -158,23 +180,41 @@ struct MarkdownTextView: NSViewRepresentable {
             return nsString.lineRange(for: NSRange(location: selectedRange.location, length: 0))
         }
         
-        // 添加复选框点击处理
-        func textView(_ textView: NSTextView, clickedOnCell cell: NSTextAttachmentCellProtocol, in cellFrame: NSRect, at charIndex: Int) -> Bool {
-            let nsString = textView.string as NSString
-            let lineRange = nsString.lineRange(for: NSRange(location: charIndex, length: 0))
-            let line = nsString.substring(with: lineRange)
+        // 修改点击处理方法
+        func textView(_ textView: NSTextView, mouseDown event: NSEvent, at charIndex: Int, offset: CGFloat) -> Bool {
+            let currentLineRange = getCurrentLineRange(textView)
+            let currentLine = (textView.string as NSString).substring(with: currentLineRange)
             
-            if line.contains(Coordinator.CHECKBOX_UNCHECKED) {
-                let newLine = line.replacingOccurrences(of: Coordinator.CHECKBOX_UNCHECKED, 
-                                                      with: Coordinator.CHECKBOX_CHECKED)
-                textView.textStorage?.replaceCharacters(in: lineRange, with: newLine)
-            } else if line.contains(Coordinator.CHECKBOX_CHECKED) {
-                let newLine = line.replacingOccurrences(of: Coordinator.CHECKBOX_CHECKED, 
-                                                      with: Coordinator.CHECKBOX_UNCHECKED)
-                textView.textStorage?.replaceCharacters(in: lineRange, with: newLine)
+            if currentLine.hasPrefix(Coordinator.CHECKBOX_UNCHECKED) {
+                toggleTodoItem(textView, lineRange: currentLineRange, isChecked: true)
+                return true
+            } else if currentLine.hasPrefix(Coordinator.CHECKBOX_CHECKED) {
+                toggleTodoItem(textView, lineRange: currentLineRange, isChecked: false)
+                return true
             }
             
-            return true
+            return false
+        }
+        
+        private func toggleTodoItem(_ textView: NSTextView, lineRange: NSRange, isChecked: Bool) {
+            let storage = textView.textStorage!
+            
+            storage.beginEditing()
+            
+            // 替换 checkbox
+            let checkboxRange = NSRange(location: lineRange.location, length: 1)
+            storage.replaceCharacters(in: checkboxRange, 
+                                    with: isChecked ? Coordinator.CHECKBOX_CHECKED : Coordinator.CHECKBOX_UNCHECKED)
+            
+            // 更新删除线样式
+            storage.addAttribute(.strikethroughStyle, 
+                                value: isChecked ? NSUnderlineStyle.single.rawValue : 0, 
+                                range: lineRange)
+            
+            storage.endEditing()
+            
+            // 更新父视图的文本
+            parent.text = textView.string
         }
     }
 }
