@@ -11,8 +11,10 @@ import SwiftData
 @Model
 final class Item {
     var timestamp: Date
+    var text: String
     
-    init(timestamp: Date) {
+    init(text: String = "", timestamp: Date = Date()) {
+        self.text = text
         self.timestamp = timestamp
     }
 }
