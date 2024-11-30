@@ -80,23 +80,18 @@ struct MarkdownTextView: NSViewRepresentable {
             let currentLineRange = getCurrentLineRange(textView)
             let currentLine = (textView.string as NSString).substring(with: currentLineRange)
             
-            // 处理待办事项，先移除可能的标题标记
-            var processedLine = currentLine
-            if processedLine.hasPrefix("### ") {
-                processedLine = String(processedLine.dropFirst(4))
-            } else if processedLine.hasPrefix("## ") {
-                processedLine = String(processedLine.dropFirst(3))
-            } else if processedLine.hasPrefix("# ") {
-                processedLine = String(processedLine.dropFirst(2))
+            // 处理待办事项和标题的组合
+            var newLine = currentLine
+            
+            // 检查并处理待办事项标记
+            if currentLine.contains("[] ") {
+                newLine = newLine.replacingOccurrences(of: "[] ", with: "□ ")
+            } else if currentLine.contains("[x] ") || currentLine.contains("[X] ") {
+                newLine = newLine.replacingOccurrences(of: "[x] ", with: "☑ ", options: .caseInsensitive)
             }
             
-            // 检查是否包含待办事项标记
-            if processedLine.hasPrefix("[] ") {
-                let newLine = currentLine.replacingOccurrences(of: "[] ", with: "□ ")
-                replaceText(textView, range: currentLineRange, with: newLine)
-            }
-            else if processedLine.hasPrefix("[x] ") || processedLine.hasPrefix("[X] ") {
-                let newLine = currentLine.replacingOccurrences(of: "[x] ", with: "☑ ", options: .caseInsensitive)
+            // 如果有任何改变，更新文本
+            if newLine != currentLine {
                 replaceText(textView, range: currentLineRange, with: newLine)
             }
             
@@ -139,22 +134,21 @@ struct MarkdownTextView: NSViewRepresentable {
                 
                 let lineRange = NSRange(location: currentLocation, length: line.count)
                 
+                // 检查标题标记
+                var headingFont: NSFont? = nil
+                if line.contains("### ") {
+                    headingFont = NSFont.systemFont(ofSize: 16.8, weight: .semibold)
+                } else if line.contains("## ") {
+                    headingFont = NSFont.systemFont(ofSize: 21, weight: .bold)
+                } else if line.contains("# ") {
+                    headingFont = NSFont.systemFont(ofSize: 28, weight: .bold)
+                }
+                
                 // 应用样式
-                if line.hasPrefix("### ") {
-                    let font = NSFont.systemFont(ofSize: 16.8, weight: .semibold)
-                    storage.addAttribute(.font, value: font, range: lineRange)
-                } else if line.hasPrefix("## ") {
-                    let font = NSFont.systemFont(ofSize: 21, weight: .bold)
-                    storage.addAttribute(.font, value: font, range: lineRange)
-                } else if line.hasPrefix("# ") {
-                    let font = NSFont.systemFont(ofSize: 28, weight: .bold)
-                    storage.addAttribute(.font, value: font, range: lineRange)
-                } else if line.hasPrefix("□ ") || line.hasPrefix("☑ ") {
-                    let font = NSFont.systemFont(ofSize: 14)
+                if let font = headingFont {
                     storage.addAttribute(.font, value: font, range: lineRange)
                 } else {
-                    let font = NSFont.systemFont(ofSize: 14)
-                    storage.addAttribute(.font, value: font, range: lineRange)
+                    storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: lineRange)
                 }
                 
                 currentLocation += line.count + (currentLocation < storage.length ? 1 : 0)
