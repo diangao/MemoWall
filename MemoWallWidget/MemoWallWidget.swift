@@ -35,16 +35,15 @@ struct SimpleEntry: TimelineEntry {
 struct MemoWallWidgetEntryView : View {
     var entry: Provider.Entry
     @Environment(\.widgetFamily) var widgetFamily
-
+    
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(entry.text)
-                .font(.system(.body, design: .monospaced))
-                .lineLimit(nil)
+        VStack(alignment: .leading, spacing: 8) {
+            MarkdownRenderer(text: entry.text, fontSize: 12, isWidget: true)
+                .lineLimit(widgetFamily == .systemSmall ? 5 : 10)
                 .padding(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(NSColor.textBackgroundColor))
+        .containerBackground(.background, for: .widget)
         .widgetURL(URL(string: "memowall://edit"))
     }
 }
@@ -55,8 +54,6 @@ struct MemoWallWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             MemoWallWidgetEntryView(entry: entry)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background()
         }
         .configurationDisplayName("MemoWall")
         .description("Quick access to your notes")
