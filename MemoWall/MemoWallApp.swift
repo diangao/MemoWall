@@ -13,8 +13,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var mainWindow: NSWindow?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // 确保 SharedDataManager 在应用启动时初始化
-        _ = SharedDataManager.shared.sharedModelContainer
+        Task {
+            // 确保 SharedDataManager 在应用启动时初始化
+            _ = await SharedDataManager.shared.sharedModelContainer
+        }
         
         // 设置应用程序行为
         NSApp.setActivationPolicy(.regular)
@@ -64,6 +66,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct MemoWallApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var dataManager = DataManager()
     
     var body: some Scene {
         WindowGroup {
@@ -88,18 +91,19 @@ struct MemoWallApp: App {
     }
 }
 
-// 管理 ModelContainer 的类
+@MainActor
 class DataManager: ObservableObject {
     @Published var modelContainer: ModelContainer?
     
     init() {
-        setupModelContainer()
+        Task {
+            await setupModelContainer()
+        }
     }
     
-    private func setupModelContainer() {
-        if let container = SharedDataManager.shared.sharedModelContainer {
-            self.modelContainer = container
-        } else {
+    private func setupModelContainer() async {
+        modelContainer = await SharedDataManager.shared.sharedModelContainer
+        if modelContainer == nil {
             print("Failed to initialize ModelContainer")
         }
     }

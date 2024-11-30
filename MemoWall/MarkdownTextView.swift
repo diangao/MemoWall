@@ -1,20 +1,35 @@
 import SwiftUI
 import AppKit
-import RegexBuilder
 
-struct MarkdownTextView: NSViewRepresentable {
+struct MarkdownTextView: View {
+    @Binding var text: String
+    var isWidget: Bool
+    
+    init(text: Binding<String>, isWidget: Bool = false) {
+        self._text = text
+        self.isWidget = isWidget
+    }
+    
+    var body: some View {
+        if isWidget {
+            MarkdownRenderedView(text: text)
+        } else {
+            MacMarkdownTextView(text: $text)
+        }
+    }
+}
+
+struct MacMarkdownTextView: NSViewRepresentable {
     @Binding var text: String
     
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         let textView = NSTextView()
         
-        // 配置滚动视图
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.documentView = textView
         
-        // 配置文本视图
         textView.delegate = context.coordinator
         textView.isRichText = true
         textView.font = .systemFont(ofSize: 14)
@@ -24,22 +39,18 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.backgroundColor = .white
         textView.drawsBackground = true
         
-        // 允许自动换行
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(
             width: scrollView.contentSize.width,
             height: CGFloat.greatestFiniteMagnitude
         )
         
-        // 启用自动布局
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         
-        // 设置文本容器的内边距
         textView.textContainerInset = NSSize(width: 10, height: 10)
         
-        // 初始化文本
         textView.string = text
         context.coordinator.applyMarkdownStyling(textView)
         
@@ -61,10 +72,10 @@ struct MarkdownTextView: NSViewRepresentable {
     }
     
     class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: MarkdownTextView
+        var parent: MacMarkdownTextView
         private var isProcessingMarkdown = false
         
-        init(_ parent: MarkdownTextView) {
+        init(_ parent: MacMarkdownTextView) {
             self.parent = parent
             super.init()
         }
@@ -76,21 +87,17 @@ struct MarkdownTextView: NSViewRepresentable {
             isProcessingMarkdown = true
             defer { isProcessingMarkdown = false }
             
-            // 获取当前行
             let currentLineRange = getCurrentLineRange(textView)
             let currentLine = (textView.string as NSString).substring(with: currentLineRange)
             
-            // 处理待办事项和标题的组合
             var newLine = currentLine
             
-            // 检查并处理待办事项标记
             if currentLine.contains("[] ") {
                 newLine = newLine.replacingOccurrences(of: "[] ", with: "□ ")
             } else if currentLine.contains("[x] ") || currentLine.contains("[X] ") {
                 newLine = newLine.replacingOccurrences(of: "[x] ", with: "☑ ", options: .caseInsensitive)
             }
             
-            // 如果有任何改变，更新文本
             if newLine != currentLine {
                 replaceText(textView, range: currentLineRange, with: newLine)
             }
@@ -108,7 +115,6 @@ struct MarkdownTextView: NSViewRepresentable {
             let cursorPosition = textView.selectedRange().location
             textView.replaceCharacters(in: range, with: newText)
             
-            // 调整光标位置
             let lengthDifference = range.length - newText.count
             let newPosition = max(range.location, cursorPosition - lengthDifference)
             textView.setSelectedRange(NSRange(location: newPosition, length: 0))
@@ -118,7 +124,6 @@ struct MarkdownTextView: NSViewRepresentable {
             let storage = textView.textStorage!
             let fullRange = NSRange(location: 0, length: storage.length)
             
-            // 重置所有样式
             storage.removeAttribute(.font, range: fullRange)
             storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
             
@@ -134,7 +139,6 @@ struct MarkdownTextView: NSViewRepresentable {
                 
                 let lineRange = NSRange(location: currentLocation, length: line.count)
                 
-                // 检查标题标记
                 var headingFont: NSFont? = nil
                 if line.contains("### ") {
                     headingFont = NSFont.systemFont(ofSize: 16.8, weight: .semibold)
@@ -144,7 +148,6 @@ struct MarkdownTextView: NSViewRepresentable {
                     headingFont = NSFont.systemFont(ofSize: 28, weight: .bold)
                 }
                 
-                // 应用样式
                 if let font = headingFont {
                     storage.addAttribute(.font, value: font, range: lineRange)
                 } else {

@@ -9,21 +9,45 @@ import WidgetKit
 import SwiftUI
 import SwiftData
 
+@MainActor
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
         SimpleEntry(date: Date(), text: "Loading...")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = SimpleEntry(date: Date(), text: SharedDataManager.shared.getText())
-        completion(entry)
+        if context.isPreview {
+            completion(SimpleEntry(date: Date(), text: "Preview text"))
+            return
+        }
+        
+        Task { @MainActor in
+            do {
+                let text = await SharedDataManager.shared.getText()
+                let entry = SimpleEntry(date: Date(), text: text)
+                completion(entry)
+            } catch {
+                let entry = SimpleEntry(date: Date(), text: "Error loading text")
+                completion(entry)
+            }
+        }
     }
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
-        let entry = SimpleEntry(date: Date(), text: SharedDataManager.shared.getText())
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
+        Task { @MainActor in
+            do {
+                let text = await SharedDataManager.shared.getText()
+                let entry = SimpleEntry(date: Date(), text: text)
+                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
+                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+                completion(timeline)
+            } catch {
+                let entry = SimpleEntry(date: Date(), text: "Error loading text")
+                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
+                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+                completion(timeline)
+            }
+        }
     }
 }
 
@@ -38,10 +62,9 @@ struct MemoWallWidgetEntryView : View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            MarkdownRenderer(text: entry.text, fontSize: 12, isWidget: true)
-                .lineLimit(widgetFamily == .systemSmall ? 5 : 10)
-                .padding(8)
+            MarkdownRenderedView(text: entry.text, isWidget: true)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(8)
         }
         .containerBackground(.background, for: .widget)
         .widgetURL(URL(string: "memowall://edit"))
@@ -59,4 +82,28 @@ struct MemoWallWidget: Widget {
         .description("Quick access to your notes")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
+}
+
+#Preview(as: .systemSmall) {
+    MemoWallWidget()
+} timeline: {
+    SimpleEntry(date: .now, text: "Hello, World!")
+}
+
+#Preview(as: .systemMedium) {
+    MemoWallWidget()
+} timeline: {
+    SimpleEntry(date: .now, text: "# Hello, World!\nThis is a preview of the widget.")
+}
+
+#Preview(as: .systemLarge) {
+    MemoWallWidget()
+} timeline: {
+    SimpleEntry(date: .now, text: """
+    # Hello, World!
+    ## This is a preview
+    This is a preview of the widget in large size.
+    - Item 1
+    - Item 2
+    """)
 }

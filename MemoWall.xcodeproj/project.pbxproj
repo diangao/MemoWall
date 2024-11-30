@@ -7,16 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		673A6A532CFBB63C00DD0B02 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A522CFBB63C00DD0B02 /* MarkdownRenderer.swift */; };
-		673A6A542CFBB63C00DD0B02 /* MarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A522CFBB63C00DD0B02 /* MarkdownRenderer.swift */; };
+		673A6A6A2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */; };
+		673A6A6B2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */; };
+		673A6A6C2CFBC69E00DD0B02 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A662CFBC69E00DD0B02 /* Item.swift */; };
+		673A6A6D2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */; };
+		673A6A6E2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */; };
+		673A6A6F2CFBC69E00DD0B02 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A662CFBC69E00DD0B02 /* Item.swift */; };
+		673A6A742CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */; };
+		673A6A752CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */; };
 		676ADC782CF2DDF500C48FBD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 676ADC772CF2DDF500C48FBD /* ContentView.swift */; };
 		678F20B12CFBA42900269BD6 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 678F20B02CFBA42900269BD6 /* WidgetKit.framework */; };
 		678F20B32CFBA42900269BD6 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 678F20B22CFBA42900269BD6 /* SwiftUI.framework */; };
 		678F20C12CFBA42A00269BD6 /* MemoWallWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 678F20AE2CFBA42900269BD6 /* MemoWallWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		678F20CB2CFBAA3500269BD6 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 678F20CA2CFBAA3500269BD6 /* SharedDataManager.swift */; };
-		678F20CC2CFBAA3500269BD6 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 678F20C92CFBAA3500269BD6 /* Item.swift */; };
-		678F20CD2CFBAA3500269BD6 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 678F20CA2CFBAA3500269BD6 /* SharedDataManager.swift */; };
-		678F20CE2CFBAA3500269BD6 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 678F20C92CFBAA3500269BD6 /* Item.swift */; };
 		67EC09BA2CE6D82B00B2902F /* MemoWallApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EC09B92CE6D82B00B2902F /* MemoWallApp.swift */; };
 		67EC09C02CE6D82C00B2902F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 67EC09BF2CE6D82C00B2902F /* Assets.xcassets */; };
 		67EC09C32CE6D82C00B2902F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 67EC09C22CE6D82C00B2902F /* Preview Assets.xcassets */; };
@@ -24,7 +26,6 @@
 		67EC09D82CE6D82C00B2902F /* MemoWallUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EC09D72CE6D82C00B2902F /* MemoWallUITests.swift */; };
 		67EC09DA2CE6D82C00B2902F /* MemoWallUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EC09D92CE6D82C00B2902F /* MemoWallUITestsLaunchTests.swift */; };
 		67EC09ED2CE6E7DC00B2902F /* Down in Frameworks */ = {isa = PBXBuildFile; productRef = 67EC09EC2CE6E7DC00B2902F /* Down */; };
-		67EC09EF2CE6E81000B2902F /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EC09EE2CE6E81000B2902F /* MarkdownTextView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,13 +68,14 @@
 
 /* Begin PBXFileReference section */
 		673A6A512CFBB01700DD0B02 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		673A6A522CFBB63C00DD0B02 /* MarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderer.swift; sourceTree = "<group>"; };
+		673A6A662CFBC69E00DD0B02 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
+		673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTextView.swift; sourceTree = "<group>"; };
+		673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDataManager.swift; sourceTree = "<group>"; };
+		673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderedView.swift; sourceTree = "<group>"; };
 		676ADC772CF2DDF500C48FBD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		678F20AE2CFBA42900269BD6 /* MemoWallWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MemoWallWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		678F20B02CFBA42900269BD6 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		678F20B22CFBA42900269BD6 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
-		678F20C92CFBAA3500269BD6 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
-		678F20CA2CFBAA3500269BD6 /* SharedDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDataManager.swift; sourceTree = "<group>"; };
 		67EC09B62CE6D82B00B2902F /* MemoWall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MemoWall.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		67EC09B92CE6D82B00B2902F /* MemoWallApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoWallApp.swift; sourceTree = "<group>"; };
 		67EC09BF2CE6D82C00B2902F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -84,7 +86,6 @@
 		67EC09D32CE6D82C00B2902F /* MemoWallUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MemoWallUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		67EC09D72CE6D82C00B2902F /* MemoWallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoWallUITests.swift; sourceTree = "<group>"; };
 		67EC09D92CE6D82C00B2902F /* MemoWallUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoWallUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		67EC09EE2CE6E81000B2902F /* MarkdownTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTextView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -136,6 +137,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		673A6A692CFBC69E00DD0B02 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */,
+				673A6A662CFBC69E00DD0B02 /* Item.swift */,
+				673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */,
+				673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		678F20AF2CFBA42900269BD6 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -148,9 +160,7 @@
 		67EC09AD2CE6D82B00B2902F = {
 			isa = PBXGroup;
 			children = (
-				673A6A522CFBB63C00DD0B02 /* MarkdownRenderer.swift */,
-				678F20C92CFBAA3500269BD6 /* Item.swift */,
-				678F20CA2CFBAA3500269BD6 /* SharedDataManager.swift */,
+				673A6A692CFBC69E00DD0B02 /* Shared */,
 				67EC09B82CE6D82B00B2902F /* MemoWall */,
 				67EC09CC2CE6D82C00B2902F /* MemoWallTests */,
 				67EC09D62CE6D82C00B2902F /* MemoWallUITests */,
@@ -177,7 +187,6 @@
 				673A6A512CFBB01700DD0B02 /* Info.plist */,
 				67EC09B92CE6D82B00B2902F /* MemoWallApp.swift */,
 				676ADC772CF2DDF500C48FBD /* ContentView.swift */,
-				67EC09EE2CE6E81000B2902F /* MarkdownTextView.swift */,
 				67EC09BF2CE6D82C00B2902F /* Assets.xcassets */,
 				67EC09C42CE6D82C00B2902F /* MemoWall.entitlements */,
 				67EC09C12CE6D82C00B2902F /* Preview Content */,
@@ -381,9 +390,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				678F20CB2CFBAA3500269BD6 /* SharedDataManager.swift in Sources */,
-				678F20CC2CFBAA3500269BD6 /* Item.swift in Sources */,
-				673A6A532CFBB63C00DD0B02 /* MarkdownRenderer.swift in Sources */,
+				673A6A6D2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */,
+				673A6A6E2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */,
+				673A6A6F2CFBC69E00DD0B02 /* Item.swift in Sources */,
+				673A6A752CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -391,12 +401,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				67EC09EF2CE6E81000B2902F /* MarkdownTextView.swift in Sources */,
 				676ADC782CF2DDF500C48FBD /* ContentView.swift in Sources */,
-				678F20CD2CFBAA3500269BD6 /* SharedDataManager.swift in Sources */,
-				678F20CE2CFBAA3500269BD6 /* Item.swift in Sources */,
+				673A6A6A2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */,
+				673A6A742CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */,
+				673A6A6B2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */,
+				673A6A6C2CFBC69E00DD0B02 /* Item.swift in Sources */,
 				67EC09BA2CE6D82B00B2902F /* MemoWallApp.swift in Sources */,
-				673A6A542CFBB63C00DD0B02 /* MarkdownRenderer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -460,7 +470,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = diangao.MemoWall.MemoWallWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = diangao.MemoWall.WidgetExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -490,7 +500,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = diangao.MemoWall.MemoWallWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = diangao.MemoWall.WidgetExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 import OSLog
 
+@MainActor
 class SharedDataManager {
     static let shared = SharedDataManager()
     private let groupIdentifier = "group.diangao.MemoWall"
@@ -22,10 +23,7 @@ class SharedDataManager {
                 let schema = Schema([Item.self])
                 let modelConfiguration = ModelConfiguration(
                     schema: schema,
-                    groupContainer: groupIdentifier,
-                    cloudKitContainerIdentifier: nil,
-                    isStoredInMemoryOnly: false,
-                    allowsSave: true
+                    groupContainer: .identifier(groupIdentifier)
                 )
                 
                 let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier)
@@ -49,9 +47,6 @@ class SharedDataManager {
                 logger.error("Failed to create ModelContainer: \(error.localizedDescription)")
                 if let nsError = error as NSError? {
                     logger.error("Error domain: \(nsError.domain), code: \(nsError.code)")
-                    if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
-                        logger.error("Underlying error: \(underlyingError.localizedDescription)")
-                    }
                 }
             }
         }
@@ -64,12 +59,9 @@ class SharedDataManager {
             return ""
         }
         
-        let descriptor = FetchDescriptor<Item>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
-        descriptor.fetchLimit = 1
-        
+        let descriptor = FetchDescriptor<Item>()
         do {
-            let context = container.mainContext
-            let items = try context.fetch(descriptor)
+            let items = try container.mainContext.fetch(descriptor)
             let text = items.first?.text ?? ""
             logger.debug("Successfully fetched text: \(text.prefix(20))...")
             return text
@@ -88,23 +80,20 @@ class SharedDataManager {
             return
         }
         
-        let context = container.mainContext
-        
+        let descriptor = FetchDescriptor<Item>()
         do {
-            let descriptor = FetchDescriptor<Item>()
-            let items = try context.fetch(descriptor)
-            
+            let items = try container.mainContext.fetch(descriptor)
             if let item = items.first {
                 item.text = text
                 item.timestamp = Date()
                 logger.debug("Updated existing item")
             } else {
                 let item = Item(text: text)
-                context.insert(item)
+                container.mainContext.insert(item)
                 logger.debug("Created new item")
             }
             
-            try context.save()
+            try container.mainContext.save()
             logger.info("Successfully saved text")
         } catch {
             logger.error("Failed to save text: \(error.localizedDescription)")

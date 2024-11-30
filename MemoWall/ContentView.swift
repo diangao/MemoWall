@@ -16,7 +16,7 @@ struct ContentView: View {
         MarkdownTextView(text: $text)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: text) { _, newValue in
-                SharedDataManager.shared.saveText(newValue)
+                SharedDataManager.shared.setText(newValue)
                 WidgetCenter.shared.reloadAllTimelines()
             }
             .onAppear {
