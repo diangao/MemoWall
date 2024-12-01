@@ -21,18 +21,29 @@ struct Provider: TimelineProvider {
         }
         
         Task {
-            let text = await SharedDataManager.shared.getText()
-            completion(SimpleEntry(date: Date(), text: text))
+            do {
+                let text = try await SharedDataManager.shared.getText()
+                completion(SimpleEntry(date: Date(), text: text))
+            } catch {
+                completion(SimpleEntry(date: Date(), text: "Failed to load text"))
+            }
         }
     }
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
         Task {
-            let text = await SharedDataManager.shared.getText()
-            let entry = SimpleEntry(date: Date(), text: text)
-            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-            completion(timeline)
+            do {
+                let text = try await SharedDataManager.shared.getText()
+                let entry = SimpleEntry(date: Date(), text: text)
+                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
+                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+                completion(timeline)
+            } catch {
+                let entry = SimpleEntry(date: Date(), text: "Failed to load text")
+                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
+                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+                completion(timeline)
+            }
         }
     }
 }

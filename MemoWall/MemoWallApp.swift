@@ -13,20 +13,47 @@ import AppKit
 struct MemoWallApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var modelContainer: ModelContainer?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
     
     var body: some Scene {
         WindowGroup(id: "main") {
             Group {
-                if let container = modelContainer {
+                if let error = errorMessage {
+                    VStack(spacing: 20) {
+                        Text("Failed to Initialize")
+                            .font(.headline)
+                        Text(error)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                        Button("Retry") {
+                            errorMessage = nil
+                            isLoading = true
+                            Task {
+                                do {
+                                    try await initializeData()
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                    .frame(maxWidth: 400)
+                } else if isLoading {
+                    ProgressView("Initializing...")
+                        .task {
+                            do {
+                                try await initializeData()
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
+                } else if let container = modelContainer {
                     ContentView()
                         .modelContainer(container)
                         .frame(minWidth: 400, minHeight: 300)
-                } else {
-                    ProgressView("Loading...")
-                        .task {
-                            await SharedDataManager.shared.initializeModelContainer()
-                            modelContainer = SharedDataManager.shared.sharedModelContainer
-                        }
                 }
             }
         }
@@ -39,12 +66,31 @@ struct MemoWallApp: App {
             CommandGroup(replacing: .newItem) { }
         }
     }
+    
+    private func initializeData() async throws {
+        do {
+            try await SharedDataManager.shared.initializeModelContainer()
+            if let container = SharedDataManager.shared.sharedModelContainer {
+                modelContainer = container
+                isLoading = false
+            } else {
+                throw NSError(
+                    domain: "MemoWallApp",
+                    code: -1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Failed to initialize data container. Please check app permissions and try again."
+                    ]
+                )
+            }
+        } catch {
+            throw error
+        }
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     static private(set) var shared: AppDelegate!
     private var mainWindowController: NSWindowController?
-    private var hasInitializedWindow = false
     
     override init() {
         super.init()
@@ -53,15 +99,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
-        
-        // 延迟初始化主窗口，避免多窗口问题
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.initializeMainWindowIfNeeded()
-        }
     }
     
     func application(_ application: NSApplication, open urls: [URL]) {
-        // 确保只处理我们的 URL scheme
         guard let url = urls.first,
               url.scheme == "memowall",
               url.host == "widget" else {
@@ -69,23 +109,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         NSApp.activate(ignoringOtherApps: true)
-        
-        // 如果已经有窗口，激活它
-        if let windowController = mainWindowController {
-            windowController.showWindow(nil)
-            windowController.window?.makeKeyAndOrderFront(nil)
-        } else {
-            // 如果找到窗口但没有保存引用
-            if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-                setupMainWindow(window)
-                hasInitializedWindow = true
-            }
-        }
+        activateOrCreateMainWindow()
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            initializeMainWindowIfNeeded()
+            activateOrCreateMainWindow()
         }
         return true
     }
@@ -94,26 +123,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
     
-    private func initializeMainWindowIfNeeded() {
-        guard !hasInitializedWindow else {
-            if let windowController = mainWindowController {
-                windowController.showWindow(nil)
-                windowController.window?.makeKeyAndOrderFront(nil)
-            }
+    private func activateOrCreateMainWindow() {
+        // 1. 如果已有窗口控制器，激活它的窗口
+        if let windowController = mainWindowController, let window = windowController.window {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
             return
         }
         
-        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-            setupMainWindow(window)
-            hasInitializedWindow = true
+        // 2. 如果没有窗口控制器但有主窗口，使用现有窗口
+        if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+            existingWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            mainWindowController = NSWindowController(window: existingWindow)
+            setupMainWindow(existingWindow)
+            return
+        }
+        
+        // 3. 如果既没有窗口控制器也没有主窗口，等待 SwiftUI 创建窗口
+        // SwiftUI 会创建窗口并触发 windowDidBecomeKey 通知
+        NSApp.windows.forEach { window in
+            print("Window: \(window.title), identifier: \(window.identifier?.rawValue ?? "nil")")
         }
     }
     
     private func setupMainWindow(_ window: NSWindow) {
-        // 设置窗口样式
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         
-        // 设置窗口大小
         let screenSize = NSScreen.main?.visibleFrame ?? .zero
         let windowSize = NSSize(width: 800, height: 600)
         let windowOrigin = NSPoint(
@@ -122,14 +158,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         window.setFrame(NSRect(origin: windowOrigin, size: windowSize), display: true)
         
-        // 设置最小大小
         window.minSize = NSSize(width: 400, height: 300)
         window.setFrameAutosaveName("Main Window")
         
-        // 创建和显示窗口
+        // 添加窗口通知观察
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: window
+        )
+    }
+    
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window.identifier?.rawValue == "main",
+              mainWindowController == nil else {
+            return
+        }
+        
         mainWindowController = NSWindowController(window: window)
-        mainWindowController?.showWindow(nil)
-        window.makeKeyAndOrderFront(nil)
     }
 }
 
