@@ -12,7 +12,6 @@ import OSLog
 @MainActor
 class SharedDataManager {
     static let shared = SharedDataManager()
-    private let groupIdentifier = "group.diangao.MemoWall"
     private let logger = Logger(subsystem: "group.diangao.MemoWall", category: "SharedDataManager")
     
     private var modelContainer: ModelContainer?
@@ -20,74 +19,47 @@ class SharedDataManager {
     
     private init() {}
     
+    @MainActor
     func initializeModelContainer() async throws {
         if modelContainer == nil {
             do {
-                // 首先验证 App Group 权限
-                guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) else {
-                    logger.error("❌ Failed to get container URL for group: \(self.groupIdentifier)")
-                    throw NSError(
-                        domain: "SharedDataManager",
-                        code: -1,
-                        userInfo: [NSLocalizedDescriptionKey: "App Group access denied. Please check entitlements."]
-                    )
-                }
-                
-                logger.debug("📂 Container URL: \(containerURL.path)")
-                
-                // 验证目录权限
-                let testFile = containerURL.appendingPathComponent("test.txt")
-                do {
-                    try "test".write(to: testFile, atomically: true, encoding: .utf8)
-                    try FileManager.default.removeItem(at: testFile)
-                    logger.debug("✅ Directory write permission verified")
-                } catch {
-                    logger.error("❌ Directory write test failed: \(error.localizedDescription)")
-                    throw NSError(
-                        domain: "SharedDataManager",
-                        code: -2,
-                        userInfo: [NSLocalizedDescriptionKey: "Directory write permission denied"]
-                    )
-                }
-                
-                // 创建 Schema 和 ModelConfiguration
+                // 使用内存存储配置
                 let schema = Schema([Item.self])
                 let modelConfiguration = ModelConfiguration(
                     schema: schema,
-                    isStoredInMemoryOnly: false,
-                    allowsSave: true,
-                    groupContainer: .identifier(groupIdentifier)
+                    isStoredInMemoryOnly: true  // 使用内存存储
                 )
                 
                 // 创建 ModelContainer
-                modelContainer = try ModelContainer(
-                    for: schema,
-                    configurations: [modelConfiguration]
-                )
-                
-                // 验证数据库访问
-                if let context = modelContainer?.mainContext {
-                    let item = Item(text: "")
-                    context.insert(item)
-                    try context.save()
-                    context.delete(item)
-                    try context.save()
-                    logger.debug("✅ Database access verified")
-                } else {
-                    logger.error("❌ Failed to get context from ModelContainer")
+                do {
+                    modelContainer = try ModelContainer(
+                        for: schema,
+                        configurations: [modelConfiguration]
+                    )
+                    logger.info("✅ Successfully initialized ModelContainer")
+                    
+                    // 从 UserDefaults 恢复数据
+                    await loadFromUserDefaults()
+                    
+                } catch {
+                    logger.error("❌ Failed to create ModelContainer: \(error.localizedDescription)")
                     throw NSError(
                         domain: "SharedDataManager",
-                        code: -3,
-                        userInfo: [NSLocalizedDescriptionKey: "Failed to access database context"]
+                        code: -2,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Failed to create ModelContainer",
+                            "NSLocalFailureReason": error.localizedDescription,
+                            NSUnderlyingErrorKey: error
+                        ]
                     )
                 }
-                
-                logger.info("✅ Successfully initialized ModelContainer")
-                
             } catch {
                 logger.error("❌ Initialization failed: \(error.localizedDescription)")
                 if let nsError = error as NSError? {
                     logger.error("Error domain: \(nsError.domain), code: \(nsError.code)")
+                    if let reason = nsError.userInfo["NSLocalFailureReason"] as? String {
+                        logger.error("Failure reason: \(reason)")
+                    }
                     if let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
                         logger.error("Underlying error: \(underlyingError)")
                     }
@@ -95,6 +67,46 @@ class SharedDataManager {
                 throw error
             }
         }
+    }
+    
+    // 获取 UserDefaults
+    private var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: "group.diangao.MemoWall")
+    }
+    
+    // 保存数据到 UserDefaults
+    @MainActor
+    func saveToUserDefaults() async {
+        guard let context = modelContainer?.mainContext else { return }
+        do {
+            let items = try context.fetch(FetchDescriptor<Item>())
+            if let lastItem = items.last {
+                sharedDefaults?.set(lastItem.text, forKey: "MemoWallText")
+                logger.debug("✅ Saved text to UserDefaults")
+            }
+        } catch {
+            logger.error("❌ Failed to save to UserDefaults: \(error.localizedDescription)")
+        }
+    }
+    
+    // 从 UserDefaults 加载数据
+    @MainActor
+    private func loadFromUserDefaults() async {
+        guard let context = modelContainer?.mainContext,
+              let text = sharedDefaults?.string(forKey: "MemoWallText") else { return }
+        
+        do {
+            let item = Item(text: text)
+            context.insert(item)
+            try context.save()
+            logger.debug("✅ Loaded text from UserDefaults")
+        } catch {
+            logger.error("❌ Failed to load from UserDefaults: \(error.localizedDescription)")
+        }
+    }
+    
+    var container: ModelContainer? {
+        modelContainer
     }
     
     func getText() async throws -> String {
@@ -149,6 +161,7 @@ class SharedDataManager {
             
             try context.save()
             logger.debug("Successfully saved text")
+            await saveToUserDefaults()
         } catch {
             logger.error("Failed to save text: \(error.localizedDescription)")
             throw error

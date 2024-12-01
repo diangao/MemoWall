@@ -56,12 +56,11 @@ struct MemoWallApp: App {
                         .frame(minWidth: 400, minHeight: 300)
                 }
             }
+            .onAppear {
+                // 在视图出现时通知 AppDelegate
+                NotificationCenter.default.post(name: NSNotification.Name("WindowDidAppear"), object: nil)
+            }
         }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 800, height: 600)
-        .windowResizability(.contentMinSize)
-        .defaultPosition(.center)
-        .handlesExternalEvents(matching: ["widget"])
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
@@ -90,7 +89,7 @@ struct MemoWallApp: App {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     static private(set) var shared: AppDelegate!
-    private var mainWindowController: NSWindowController?
+    private var mainWindow: NSWindow?
     
     override init() {
         super.init()
@@ -99,6 +98,56 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        
+        // 监听窗口创建
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWindowDidAppear),
+            name: NSNotification.Name("WindowDidAppear"),
+            object: nil
+        )
+    }
+    
+    @objc private func handleWindowDidAppear() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // 如果已经有主窗口，直接返回
+            if self.mainWindow?.isVisible == true {
+                return
+            }
+            
+            // 找到第一个主窗口
+            if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+                self.mainWindow = window
+                
+                // 设置窗口样式
+                window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+                window.titleVisibility = .hidden
+                window.titlebarAppearsTransparent = true
+                window.standardWindowButton(.zoomButton)?.isHidden = true
+                
+                // 设置窗口大小和位置
+                let screenSize = NSScreen.main?.visibleFrame ?? .zero
+                let windowSize = NSSize(width: 800, height: 600)
+                let windowOrigin = NSPoint(
+                    x: (screenSize.width - windowSize.width) / 2,
+                    y: (screenSize.height - windowSize.height) / 2
+                )
+                window.setFrame(NSRect(origin: windowOrigin, size: windowSize), display: true)
+                
+                // 关闭其他所有主窗口
+                NSApp.windows.forEach { otherWindow in
+                    if otherWindow !== window && otherWindow.identifier?.rawValue == "main" {
+                        otherWindow.close()
+                    }
+                }
+                
+                // 显示并激活窗口
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
     }
     
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -108,76 +157,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        NSApp.activate(ignoringOtherApps: true)
-        activateOrCreateMainWindow()
-    }
-    
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            activateOrCreateMainWindow()
-        }
-        return true
-    }
-    
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        return true
-    }
-    
-    private func activateOrCreateMainWindow() {
-        // 1. 如果已有窗口控制器，激活它的窗口
-        if let windowController = mainWindowController, let window = windowController.window {
+        // 如果已经有窗口，激活它
+        if let window = mainWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         
-        // 2. 如果没有窗口控制器但有主窗口，使用现有窗口
-        if let existingWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-            existingWindow.makeKeyAndOrderFront(nil)
+        // 否则发送通知创建新窗口
+        NotificationCenter.default.post(name: NSNotification.Name("WindowDidAppear"), object: nil)
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            // 如果没有可见窗口，让 SwiftUI 创建一个
+            return true
+        }
+        
+        // 如果有可见窗口，激活它
+        if let window = mainWindow {
+            window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
-            mainWindowController = NSWindowController(window: existingWindow)
-            setupMainWindow(existingWindow)
-            return
         }
         
-        // 3. 如果既没有窗口控制器也没有主窗口，等待 SwiftUI 创建窗口
-        // SwiftUI 会创建窗口并触发 windowDidBecomeKey 通知
-        NSApp.windows.forEach { window in
-            print("Window: \(window.title), identifier: \(window.identifier?.rawValue ?? "nil")")
-        }
+        return false
     }
     
-    private func setupMainWindow(_ window: NSWindow) {
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        
-        let screenSize = NSScreen.main?.visibleFrame ?? .zero
-        let windowSize = NSSize(width: 800, height: 600)
-        let windowOrigin = NSPoint(
-            x: (screenSize.width - windowSize.width) / 2,
-            y: (screenSize.height - windowSize.height) / 2
-        )
-        window.setFrame(NSRect(origin: windowOrigin, size: windowSize), display: true)
-        
-        window.minSize = NSSize(width: 400, height: 300)
-        window.setFrameAutosaveName("Main Window")
-        
-        // 添加窗口通知观察
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidBecomeKey(_:)),
-            name: NSWindow.didBecomeKeyNotification,
-            object: window
-        )
-    }
-    
-    @objc private func windowDidBecomeKey(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow,
-              window.identifier?.rawValue == "main",
-              mainWindowController == nil else {
-            return
-        }
-        
-        mainWindowController = NSWindowController(window: window)
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // 当最后一个窗口关闭时，重置主窗口引用
+        mainWindow = nil
+        return true
     }
 }
 
