@@ -9,7 +9,6 @@ import WidgetKit
 import SwiftUI
 import SwiftData
 
-@MainActor
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
         SimpleEntry(date: Date(), text: "Loading...")
@@ -21,32 +20,19 @@ struct Provider: TimelineProvider {
             return
         }
         
-        Task { @MainActor in
-            do {
-                let text = await SharedDataManager.shared.getText()
-                let entry = SimpleEntry(date: Date(), text: text)
-                completion(entry)
-            } catch {
-                let entry = SimpleEntry(date: Date(), text: "Error loading text")
-                completion(entry)
-            }
+        Task {
+            let text = await SharedDataManager.shared.getText()
+            completion(SimpleEntry(date: Date(), text: text))
         }
     }
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
-        Task { @MainActor in
-            do {
-                let text = await SharedDataManager.shared.getText()
-                let entry = SimpleEntry(date: Date(), text: text)
-                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
-                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-                completion(timeline)
-            } catch {
-                let entry = SimpleEntry(date: Date(), text: "Error loading text")
-                let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
-                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-                completion(timeline)
-            }
+        Task {
+            let text = await SharedDataManager.shared.getText()
+            let entry = SimpleEntry(date: Date(), text: text)
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date())!
+            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            completion(timeline)
         }
     }
 }
@@ -67,7 +53,7 @@ struct MemoWallWidgetEntryView : View {
                 .padding(8)
         }
         .containerBackground(.background, for: .widget)
-        .widgetURL(URL(string: "memowall://edit"))
+        .widgetURL(URL(string: "memowall://widget"))
     }
 }
 

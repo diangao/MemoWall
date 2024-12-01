@@ -9,85 +9,127 @@ import SwiftUI
 import SwiftData
 import AppKit
 
+@main
+struct MemoWallApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var modelContainer: ModelContainer?
+    
+    var body: some Scene {
+        WindowGroup(id: "main") {
+            Group {
+                if let container = modelContainer {
+                    ContentView()
+                        .modelContainer(container)
+                        .frame(minWidth: 400, minHeight: 300)
+                } else {
+                    ProgressView("Loading...")
+                        .task {
+                            await SharedDataManager.shared.initializeModelContainer()
+                            modelContainer = SharedDataManager.shared.sharedModelContainer
+                        }
+                }
+            }
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 800, height: 600)
+        .windowResizability(.contentMinSize)
+        .defaultPosition(.center)
+        .handlesExternalEvents(matching: ["widget"])
+        .commands {
+            CommandGroup(replacing: .newItem) { }
+        }
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var mainWindow: NSWindow?
+    static private(set) var shared: AppDelegate!
+    private var mainWindowController: NSWindowController?
+    private var hasInitializedWindow = false
+    
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Task {
-            // 确保 SharedDataManager 在应用启动时初始化
-            _ = await SharedDataManager.shared.sharedModelContainer
-        }
-        
-        // 设置应用程序行为
         NSApp.setActivationPolicy(.regular)
         
-        // 禁用新建窗口菜单项
-        if let newWindowItem = NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "New Window") {
-            newWindowItem.isEnabled = false
+        // 延迟初始化主窗口，避免多窗口问题
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.initializeMainWindowIfNeeded()
+        }
+    }
+    
+    func application(_ application: NSApplication, open urls: [URL]) {
+        // 确保只处理我们的 URL scheme
+        guard let url = urls.first,
+              url.scheme == "memowall",
+              url.host == "widget" else {
+            return
+        }
+        
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // 如果已经有窗口，激活它
+        if let windowController = mainWindowController {
+            windowController.showWindow(nil)
+            windowController.window?.makeKeyAndOrderFront(nil)
+        } else {
+            // 如果找到窗口但没有保存引用
+            if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+                setupMainWindow(window)
+                hasInitializedWindow = true
+            }
         }
     }
     
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            createAndShowMainWindow()
+            initializeMainWindowIfNeeded()
         }
         return true
     }
     
-    func application(_ application: NSApplication, open urls: [URL]) {
-        showMainWindow()
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
     }
     
-    private func createAndShowMainWindow() {
-        if mainWindow == nil {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.center()
-            window.setFrameAutosaveName("Main Window")
-            window.title = "MemoWall"
-            window.isReleasedWhenClosed = false
-            mainWindow = window
+    private func initializeMainWindowIfNeeded() {
+        guard !hasInitializedWindow else {
+            if let windowController = mainWindowController {
+                windowController.showWindow(nil)
+                windowController.window?.makeKeyAndOrderFront(nil)
+            }
+            return
         }
-        showMainWindow()
-    }
-    
-    private func showMainWindow() {
-        if let window = mainWindow {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+        
+        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+            setupMainWindow(window)
+            hasInitializedWindow = true
         }
     }
-}
-
-@main
-struct MemoWallApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @StateObject private var dataManager = DataManager()
     
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .onAppear {
-                    // 关闭自动创建的窗口
-                    if let firstWindow = NSApp.windows.first {
-                        firstWindow.close()
-                    }
-                    if let window = NSApp.windows.first {
-                        appDelegate.mainWindow = window
-                    }
-                }
-        }
-        .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 800, height: 600)
-        .windowResizability(.contentSize)
-        .handlesExternalEvents(matching: Set(arrayLiteral: "*"))
-        .commands {
-            CommandGroup(replacing: .newItem) { }  // 禁用新建窗口命令
-        }
+    private func setupMainWindow(_ window: NSWindow) {
+        // 设置窗口样式
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        
+        // 设置窗口大小
+        let screenSize = NSScreen.main?.visibleFrame ?? .zero
+        let windowSize = NSSize(width: 800, height: 600)
+        let windowOrigin = NSPoint(
+            x: (screenSize.width - windowSize.width) / 2,
+            y: (screenSize.height - windowSize.height) / 2
+        )
+        window.setFrame(NSRect(origin: windowOrigin, size: windowSize), display: true)
+        
+        // 设置最小大小
+        window.minSize = NSSize(width: 400, height: 300)
+        window.setFrameAutosaveName("Main Window")
+        
+        // 创建和显示窗口
+        mainWindowController = NSWindowController(window: window)
+        mainWindowController?.showWindow(nil)
+        window.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -97,7 +139,13 @@ class DataManager: ObservableObject {
     
     init() {
         Task {
-            await setupModelContainer()
+            do {
+                let schema = Schema([Item.self])
+                let modelConfiguration = ModelConfiguration(schema: schema)
+                modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            } catch {
+                print("Failed to create ModelContainer: \(error.localizedDescription)")
+            }
         }
     }
     

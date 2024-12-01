@@ -12,7 +12,7 @@ struct MarkdownTextView: View {
     
     var body: some View {
         if isWidget {
-            MarkdownRenderedView(text: text)
+            MarkdownRenderedView(text: text, isWidget: true)
         } else {
             MacMarkdownTextView(text: $text)
         }
@@ -140,11 +140,11 @@ struct MacMarkdownTextView: NSViewRepresentable {
                 let lineRange = NSRange(location: currentLocation, length: line.count)
                 
                 var headingFont: NSFont? = nil
-                if line.contains("### ") {
+                if line.hasPrefix("### ") {
                     headingFont = NSFont.systemFont(ofSize: 16.8, weight: .semibold)
-                } else if line.contains("## ") {
+                } else if line.hasPrefix("## ") {
                     headingFont = NSFont.systemFont(ofSize: 21, weight: .bold)
-                } else if line.contains("# ") {
+                } else if line.hasPrefix("# ") {
                     headingFont = NSFont.systemFont(ofSize: 28, weight: .bold)
                 }
                 

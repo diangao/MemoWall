@@ -15,34 +15,42 @@ class SharedDataManager {
     private let groupIdentifier = "group.diangao.MemoWall"
     private let logger = Logger(subsystem: "group.diangao.MemoWall", category: "SharedDataManager")
     
-    private var _sharedModelContainer: ModelContainer?
+    private var modelContainer: ModelContainer?
+    var sharedModelContainer: ModelContainer? { modelContainer }
     
-    var sharedModelContainer: ModelContainer? {
-        if _sharedModelContainer == nil {
+    private init() {}
+    
+    func initializeModelContainer() async {
+        if modelContainer == nil {
             do {
                 let schema = Schema([Item.self])
+                let groupId = self.groupIdentifier
                 let modelConfiguration = ModelConfiguration(
                     schema: schema,
-                    groupContainer: .identifier(groupIdentifier)
+                    groupContainer: .identifier(groupId)
                 )
                 
-                let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier)
-                logger.debug("Container URL: \(containerURL?.path ?? "nil")")
-                
-                _sharedModelContainer = try ModelContainer(
-                    for: schema,
-                    configurations: [modelConfiguration]
-                )
-                logger.info("Successfully created ModelContainer")
-                
-                // 尝试立即保存一个空项目来验证存储
-                let context = _sharedModelContainer?.mainContext
-                let item = Item(text: "")
-                context?.insert(item)
-                try context?.save()
-                context?.delete(item)
-                try context?.save()
-                logger.debug("Successfully verified storage access")
+                if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupId) {
+                    logger.debug("Container URL: \(containerURL.path)")
+                    
+                    modelContainer = try ModelContainer(
+                        for: schema,
+                        configurations: [modelConfiguration]
+                    )
+                    logger.info("Successfully created ModelContainer")
+                    
+                    // 验证存储访问
+                    if let context = modelContainer?.mainContext {
+                        let item = Item(text: "")
+                        context.insert(item)
+                        try context.save()
+                        context.delete(item)
+                        try context.save()
+                        logger.debug("Successfully verified storage access")
+                    }
+                } else {
+                    logger.error("Failed to get container URL for group: \(groupId)")
+                }
             } catch {
                 logger.error("Failed to create ModelContainer: \(error.localizedDescription)")
                 if let nsError = error as NSError? {
@@ -50,18 +58,19 @@ class SharedDataManager {
                 }
             }
         }
-        return _sharedModelContainer
     }
     
-    func getText() -> String {
-        guard let container = sharedModelContainer else {
-            logger.error("ModelContainer not available")
+    func getText() async -> String {
+        await initializeModelContainer()
+        
+        guard let context = modelContainer?.mainContext else {
+            logger.error("No context available")
             return ""
         }
         
-        let descriptor = FetchDescriptor<Item>()
         do {
-            let items = try container.mainContext.fetch(descriptor)
+            let descriptor = FetchDescriptor<Item>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+            let items = try context.fetch(descriptor)
             let text = items.first?.text ?? ""
             logger.debug("Successfully fetched text: \(text.prefix(20))...")
             return text
@@ -74,26 +83,29 @@ class SharedDataManager {
         }
     }
     
-    func setText(_ text: String) {
-        guard let container = sharedModelContainer else {
-            logger.error("ModelContainer not available")
+    func setText(_ text: String) async {
+        await initializeModelContainer()
+        
+        guard let context = modelContainer?.mainContext else {
+            logger.error("No context available")
             return
         }
         
-        let descriptor = FetchDescriptor<Item>()
         do {
-            let items = try container.mainContext.fetch(descriptor)
+            let descriptor = FetchDescriptor<Item>()
+            let items = try context.fetch(descriptor)
+            
             if let item = items.first {
                 item.text = text
                 item.timestamp = Date()
                 logger.debug("Updated existing item")
             } else {
                 let item = Item(text: text)
-                container.mainContext.insert(item)
+                context.insert(item)
                 logger.debug("Created new item")
             }
             
-            try container.mainContext.save()
+            try context.save()
             logger.info("Successfully saved text")
         } catch {
             logger.error("Failed to save text: \(error.localizedDescription)")
@@ -105,6 +117,4 @@ class SharedDataManager {
             }
         }
     }
-    
-    private init() {}
 }
