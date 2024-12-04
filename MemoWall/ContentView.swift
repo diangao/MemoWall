@@ -13,7 +13,8 @@ struct ContentView: View {
     @State private var text: String = ""
     @State private var lastSavedText: String = ""
     @State private var errorMessage: String?
-    
+    @State private var saveTask: Task<Void, Never>?
+
     var body: some View {
         ZStack {
             MarkdownTextView(text: $text)
@@ -23,13 +24,23 @@ struct ContentView: View {
                     // 避免重复保存相同的文本
                     guard newValue != lastSavedText else { return }
                     
-                    // 使用 Task 包装异步调用
-                    Task {
+                    // 取消之前的保存任务
+                    saveTask?.cancel()
+                    
+                    // 创建新的保存任务，延迟500ms
+                    saveTask = Task {
                         do {
+                            try await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                            guard !Task.isCancelled else { return }
+                            
                             try await SharedDataManager.shared.setText(newValue)
-                            lastSavedText = newValue
-                            errorMessage = nil
-                            WidgetCenter.shared.reloadAllTimelines()
+                            if !Task.isCancelled {
+                                lastSavedText = newValue
+                                errorMessage = nil
+                                WidgetCenter.shared.reloadAllTimelines()
+                            }
+                        } catch is CancellationError {
+                            // 忽略取消错误
                         } catch {
                             errorMessage = "Failed to save: \(error.localizedDescription)"
                         }

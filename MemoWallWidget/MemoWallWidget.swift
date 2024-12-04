@@ -34,7 +34,6 @@ struct MemoWallWidgetEntryView: View {
     }
 }
 
-@main
 struct MemoWallWidget: Widget {
     let kind: String = "MemoWallWidget"
 
@@ -49,12 +48,8 @@ struct MemoWallWidget: Widget {
     }
 }
 
-struct MemoWallWidget_Previews: PreviewProvider {
-    static var previews: some View {
-        MemoWallWidgetEntryView(entry: SimpleEntry(
-            date: Date(),
-            text: "Hello World!"
-        ))
-        .previewContext(WidgetPreviewContext(family: .systemSmall))
-    }
+#Preview(as: .systemSmall) {
+    MemoWallWidget()
+} timeline: {
+    SimpleEntry(date: .now, text: "Preview Content")
 }
