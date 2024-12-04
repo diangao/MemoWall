@@ -168,6 +168,16 @@ struct MarkdownTextView: NSViewRepresentable {
             
             print("Processing line \(currentLineNumber): '\(currentLine)'")
             
+            // Check if current line is empty
+            if currentLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if lineHeaderLevels[currentLineNumber] != nil {
+                    print("Removing header level for empty line \(currentLineNumber)")
+                    lineHeaderLevels.removeValue(forKey: currentLineNumber)
+                    applyMarkdownStyling(textView)
+                    return
+                }
+            }
+            
             var newLine = currentLine
             
             // 检查标题标记
@@ -223,41 +233,32 @@ struct MarkdownTextView: NSViewRepresentable {
             let text = textView.string
             let storage = textView.textStorage!
             
-            // Reset all styles
+            // 重置所有样式
             let fullRange = NSRange(location: 0, length: text.count)
             storage.removeAttribute(.font, range: fullRange)
-            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 15, weight: .regular), range: fullRange)
+            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
             
             // 遍历所有标题行并应用样式
             for (lineNumber, headerLevel) in self.lineHeaderLevels {
                 let lineRange = getRangeOfLine(at: lineNumber, in: text)
                 if lineRange.length > 0 {
-                    let fontSize: CGFloat
-                    switch headerLevel {
-                    case 1: fontSize = 28
-                    case 2: fontSize = 24
-                    case 3: fontSize = 20
-                    default: fontSize = 17
-                    }
-                    
+                    let fontSize = HeaderStyle.fontSize(for: headerLevel)
                     let font = NSFont.boldSystemFont(ofSize: fontSize)
                     storage.addAttribute(.font, value: font, range: lineRange)
-                    storage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: lineRange)
                     
                     let line = (text as NSString).substring(with: lineRange)
                     print("Applied style - Line \(lineNumber): '\(line)' with level \(headerLevel)")
                 }
             }
             
-            // Handle todos with modern styling
+            // Style todo checkboxes
             text.enumerateLines { line, _ in
                 let lineRange = (text as NSString).range(of: line)
                 let todoInfo = getTodoInfo(line)
                 if todoInfo.hasTodo {
-                    let checkboxFont = NSFont.systemFont(ofSize: 15)
+                    let checkboxFont = NSFont.systemFont(ofSize: 14)
                     storage.addAttribute(.font, value: checkboxFont, range: todoInfo.todoRange)
                     
-                    // Style checkbox
                     if line.contains("☑") {
                         storage.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: todoInfo.todoRange)
                     } else {
