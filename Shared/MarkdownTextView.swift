@@ -18,8 +18,8 @@ private func getTodoInfo(_ line: String) -> (hasTodo: Bool, todoRange: NSRange, 
 }
 
 private func getHeaderInfo(_ text: String) -> (isHeader: Bool, level: Int, hashRange: NSRange, contentRange: NSRange) {
-    // 修改正则表达式，使其能匹配标题标记前后的待办事项
-    let pattern = "^\\s*(?:(?:□|☑)\\s+)?(#{1,6})\\s+(?:(?:□|☑)\\s+)?(?:.*|$)"
+    // 修改正则表达式，使其能匹配标题标记，不管前面是否有 todo 标记
+    let pattern = "^(?:\\s*(?:□|☑)\\s+)?(#{1,6})\\s+"
     guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
         return (false, 0, NSRange(location: 0, length: 0), NSRange(location: 0, length: 0))
     }
@@ -29,7 +29,7 @@ private func getHeaderInfo(_ text: String) -> (isHeader: Bool, level: Int, hashR
         let level = hashRange.length        // #的数量就是标题级别
         
         // 计算内容的范围（从标题标记开始到行尾）
-        let contentStart = hashRange.location
+        let contentStart = hashRange.location + hashRange.length
         let contentLength = text.count - contentStart
         let contentRange = NSRange(location: contentStart, length: contentLength)
         
@@ -180,17 +180,17 @@ struct MarkdownTextView: NSViewRepresentable {
             
             var newLine = currentLine
             
-            // 检查标题标记
-            let headerInfo = getHeaderInfo(newLine)
-            let isHeader = headerInfo.isHeader
-            let headerLevel = headerInfo.level
-            
             // 处理待办事项标记
             if currentLine.contains("[] ") {
                 newLine = newLine.replacingOccurrences(of: "[] ", with: "□ ")
             } else if currentLine.contains("[x] ") || currentLine.contains("[X] ") {
                 newLine = newLine.replacingOccurrences(of: "[x] ", with: "☑ ", options: .caseInsensitive)
             }
+            
+            // 检查标题标记
+            let headerInfo = getHeaderInfo(newLine)
+            let isHeader = headerInfo.isHeader
+            let headerLevel = headerInfo.level
             
             // 如果是标题行
             if isHeader {
@@ -199,9 +199,9 @@ struct MarkdownTextView: NSViewRepresentable {
                 
                 // 如果输入了空格，则删除标题标记但保持样式
                 if let lastChar = newLine.last, lastChar == " " {
-                    let hashRange = headerInfo.hashRange
-                    let range = NSRange(location: currentLineRange.location + hashRange.location, length: hashRange.length + 1)
-                    replaceText(textView, range: range, with: "")
+                    let hashRange = NSRange(location: currentLineRange.location + headerInfo.hashRange.location,
+                                         length: headerInfo.hashRange.length + 1)
+                    replaceText(textView, range: hashRange, with: "")
                 }
             }
             
