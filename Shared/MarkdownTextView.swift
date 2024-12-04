@@ -256,13 +256,15 @@ struct MarkdownTextView: NSViewRepresentable {
                 let lineRange = (text as NSString).range(of: line)
                 let todoInfo = getTodoInfo(line)
                 if todoInfo.hasTodo {
+                    // 只为复选框符号设置样式
+                    let checkboxRange = NSRange(location: lineRange.location, length: 1)
                     let checkboxFont = NSFont.systemFont(ofSize: 14)
-                    storage.addAttribute(.font, value: checkboxFont, range: todoInfo.todoRange)
+                    storage.addAttribute(.font, value: checkboxFont, range: checkboxRange)
                     
                     if line.contains("☑") {
-                        storage.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: todoInfo.todoRange)
+                        storage.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: checkboxRange)
                     } else {
-                        storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: todoInfo.todoRange)
+                        storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: checkboxRange)
                     }
                 }
             }
