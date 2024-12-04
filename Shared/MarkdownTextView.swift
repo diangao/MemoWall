@@ -75,15 +75,21 @@ struct MarkdownTextView: NSViewRepresentable {
         scrollView.hasHorizontalScroller = false
         scrollView.documentView = textView
         
+        // Modern styling for the scroll view
+        scrollView.scrollerStyle = .overlay
+        scrollView.backgroundColor = .clear
+        
         textView.delegate = context.coordinator
         textView.isRichText = true
-        textView.font = .systemFont(ofSize: 14)
+        textView.font = .systemFont(ofSize: 15, weight: .regular)
         textView.isEditable = !isWidget
         textView.isSelectable = true
         textView.allowsUndo = true
         textView.backgroundColor = .clear
         textView.drawsBackground = false
         
+        // Improved text container settings
+        textView.textContainer?.lineFragmentPadding = 12
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(
             width: scrollView.contentSize.width,
@@ -94,7 +100,17 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
         
-        textView.textContainerInset = NSSize(width: 10, height: 10)
+        // Add comfortable padding
+        textView.textContainerInset = NSSize(width: 16, height: 16)
+        
+        // Enable smooth text rendering
+        textView.usesAdaptiveColorMappingForDarkAppearance = true
+        
+        // Set default paragraph style for better text layout
+        let defaultParagraphStyle = NSMutableParagraphStyle()
+        defaultParagraphStyle.lineSpacing = 1.2 // Comfortable line spacing
+        defaultParagraphStyle.paragraphSpacing = 8 // Space between paragraphs
+        textView.defaultParagraphStyle = defaultParagraphStyle
         
         textView.string = text
         context.coordinator.applyMarkdownStyling(textView)
@@ -207,10 +223,10 @@ struct MarkdownTextView: NSViewRepresentable {
             let text = textView.string
             let storage = textView.textStorage!
             
-            // 重置所有样式
+            // Reset all styles
             let fullRange = NSRange(location: 0, length: text.count)
             storage.removeAttribute(.font, range: fullRange)
-            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
+            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 15, weight: .regular), range: fullRange)
             
             // 遍历所有标题行并应用样式
             for (lineNumber, headerLevel) in self.lineHeaderLevels {
@@ -219,16 +235,34 @@ struct MarkdownTextView: NSViewRepresentable {
                     let fontSize: CGFloat
                     switch headerLevel {
                     case 1: fontSize = 28
-                    case 2: fontSize = 21
-                    case 3: fontSize = 16.8
-                    default: fontSize = 14
+                    case 2: fontSize = 24
+                    case 3: fontSize = 20
+                    default: fontSize = 17
                     }
                     
                     let font = NSFont.boldSystemFont(ofSize: fontSize)
                     storage.addAttribute(.font, value: font, range: lineRange)
+                    storage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: lineRange)
                     
                     let line = (text as NSString).substring(with: lineRange)
                     print("Applied style - Line \(lineNumber): '\(line)' with level \(headerLevel)")
+                }
+            }
+            
+            // Handle todos with modern styling
+            text.enumerateLines { line, _ in
+                let lineRange = (text as NSString).range(of: line)
+                let todoInfo = getTodoInfo(line)
+                if todoInfo.hasTodo {
+                    let checkboxFont = NSFont.systemFont(ofSize: 15)
+                    storage.addAttribute(.font, value: checkboxFont, range: todoInfo.todoRange)
+                    
+                    // Style checkbox
+                    if line.contains("☑") {
+                        storage.addAttribute(.foregroundColor, value: NSColor.systemGreen, range: todoInfo.todoRange)
+                    } else {
+                        storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: todoInfo.todoRange)
+                    }
                 }
             }
         }

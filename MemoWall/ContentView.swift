@@ -17,9 +17,19 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            Color(NSColor.windowBackgroundColor)
+                .ignoresSafeArea()
+            
             MarkdownTextView(text: $text)
                 .frame(minWidth: 400, minHeight: 300)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(NSColor.textBackgroundColor))
+                        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                )
+                .padding()
                 .onChange(of: text) { _, newValue in
                     // 避免重复保存相同的文本
                     guard newValue != lastSavedText else { return }
@@ -62,10 +72,15 @@ struct ContentView: View {
                     HStack {
                         Spacer()
                         Text(error)
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white)
-                            .padding()
-                            .background(Color.red.opacity(0.8))
-                            .cornerRadius(8)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(
+                                Capsule()
+                                    .fill(Color.red.opacity(0.9))
+                                    .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+                            )
                             .padding()
                         Spacer()
                     }
@@ -73,5 +88,6 @@ struct ContentView: View {
                 }
             }
         }
+        .frame(minWidth: 500, minHeight: 400)
     }
 }
