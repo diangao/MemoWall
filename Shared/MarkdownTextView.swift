@@ -58,6 +58,58 @@ private func getRangeOfLine(at lineNumber: Int, in text: String) -> NSRange {
     return NSRange(location: 0, length: 0)
 }
 
+// 日期处理辅助函数
+private func getDateInfo(_ text: String) -> (hasDate: Bool, dateRange: NSRange, formattedDate: String) {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "MMM d, yyyy"
+    let calendar = Calendar.current
+    let today = Date()
+    
+    // 匹配 @today, @tmr, @yesterday，后面必须跟空格
+    if let match = text.range(of: "@(today|tmr|yesterday)\\s", options: .regularExpression) {
+        let keyword = text[match].dropFirst().trimmingCharacters(in: .whitespaces) // 去掉@和空格
+        let date: Date
+        switch keyword {
+        case "today":
+            date = today
+        case "tmr":
+            date = calendar.date(byAdding: .day, value: 1, to: today)!
+        case "yesterday":
+            date = calendar.date(byAdding: .day, value: -1, to: today)!
+        default:
+            return (false, NSRange(location: 0, length: 0), "")
+        }
+        let nsRange = NSRange(match, in: text)
+        return (true, nsRange, dateFormatter.string(from: date))
+    }
+    
+    // 匹配 @dec 18 格式，必须以空格结尾
+    let monthPattern = "@(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\d{1,2})\\s"
+    if let match = try? NSRegularExpression(pattern: monthPattern, options: [.caseInsensitive])
+        .firstMatch(in: text, range: NSRange(location: 0, length: text.count)) {
+        let monthStr = (text as NSString).substring(with: match.range(at: 1))
+        let dayStr = (text as NSString).substring(with: match.range(at: 2))
+        
+        if let day = Int(dayStr) {
+            var components = calendar.dateComponents([.year], from: today)
+            components.day = day
+            
+            // 设置月份
+            let months = ["jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+                         "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12]
+            if let month = months[monthStr.lowercased()] {
+                components.month = month
+                
+                if let date = calendar.date(from: components) {
+                    return (true, match.range, dateFormatter.string(from: date))
+                }
+            }
+        }
+    }
+    
+    return (false, NSRange(location: 0, length: 0), "")
+}
+
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
     var isWidget: Bool
@@ -179,6 +231,15 @@ struct MarkdownTextView: NSViewRepresentable {
             }
             
             var newLine = currentLine
+            
+            // 处理日期快捷输入
+            let dateInfo = getDateInfo(newLine)
+            if dateInfo.hasDate {
+                let dateRange = NSRange(location: currentLineRange.location + dateInfo.dateRange.location,
+                                      length: dateInfo.dateRange.length)
+                replaceText(textView, range: dateRange, with: dateInfo.formattedDate)
+                newLine = (textView.string as NSString).substring(with: currentLineRange)
+            }
             
             // 处理待办事项标记
             if currentLine.contains("[] ") {
