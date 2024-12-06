@@ -162,8 +162,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(
             width: scrollView.contentSize.width,
-            height: CGFloat.greatestFiniteMagnitude
-        )
+            height: CGFloat.greatestFiniteMagnitude)
         
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false

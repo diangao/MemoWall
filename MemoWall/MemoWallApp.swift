@@ -65,6 +65,28 @@ struct MemoWallApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) { }
+            
+            // 添加字体大小调整命令
+            CommandMenu("View") {
+                Group {
+                    Button("Increase Font Size") {
+                        print("Command + pressed, increasing font size")
+                        AppDelegate.shared.adjustFontSize(increase: true)
+                    }
+                    .keyboardShortcut("=", modifiers: .command)
+                    
+                    Button("Decrease Font Size") {
+                        print("Command - pressed, decreasing font size")
+                        AppDelegate.shared.adjustFontSize(increase: false)
+                    }
+                    .keyboardShortcut("-", modifiers: .command)
+                    
+                    Divider()
+                    
+                    Text("Font Size: \(Int(appDelegate.fontSize))pt")
+                        .disabled(true)
+                }
+            }
         }
     }
     
@@ -90,6 +112,10 @@ struct MemoWallApp: App {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+    static let minFontSize: CGFloat = 8.0
+    static let maxFontSize: CGFloat = 48.0
+    static let fontSizeStep: CGFloat = 2.0
+    
     static private(set) var shared: AppDelegate!
     private var mainWindow: NSWindow?
     @Published var isPinned: Bool = false {
@@ -100,12 +126,61 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
     
+    // 添加一个专门用于字体大小更新的通知名称
+    static let fontSizeDidChangeNotification = NSNotification.Name("FontSizeDidChange")
+    
+    // 初始化时从 UserDefaults 读取字体大小，如果没有则使用默认值 14.0
+    @Published var fontSize: CGFloat {
+        didSet {
+            // 确保字体大小在有效范围内
+            if fontSize < AppDelegate.minFontSize {
+                fontSize = AppDelegate.minFontSize
+            } else if fontSize > AppDelegate.maxFontSize {
+                fontSize = AppDelegate.maxFontSize
+            }
+            
+            // 保存到 UserDefaults
+            UserDefaults.standard.set(fontSize, forKey: "fontSize")
+            print("Font size updated to: \(fontSize)")
+        }
+    }
+    
     override init() {
+        // 从 UserDefaults 加载字体大小，如果没有则使用默认值
+        self.fontSize = UserDefaults.standard.cgFloat(forKey: "fontSize") ?? 14.0
         super.init()
         Self.shared = self
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
+        
+        // 监听快捷键
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return event }
+            
+            // 检查是否按下 Command 键
+            if event.modifierFlags.contains(.command) {
+                switch event.charactersIgnoringModifiers {
+                case "+", "=":  // Command + 或 Command =
+                    print("Detected Command + for font size increase")
+                    self.adjustFontSize(increase: true)
+                    return nil
+                case "-", "_":  // Command - 或 Command _
+                    print("Detected Command - for font size decrease")
+                    self.adjustFontSize(increase: false)
+                    return nil
+                default:
+                    break
+                }
+            }
+            return event
+        }
+        
+        setupMainWindow()
+    }
+    
+    private func setupMainWindow() {
         if let window = NSApp.windows.first {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
@@ -217,6 +292,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // 当最后一个窗口关闭时，重置主窗口引用
         mainWindow = nil
         return true
+    }
+    
+    func adjustFontSize(increase: Bool) {
+        let oldSize = fontSize
+        let newSize = increase ? 
+            min(oldSize + AppDelegate.fontSizeStep, AppDelegate.maxFontSize) :
+            max(oldSize - AppDelegate.fontSizeStep, AppDelegate.minFontSize)
+        
+        if oldSize != newSize {
+            fontSize = newSize
+            print("Font size adjusted from \(oldSize) to \(newSize)")
+        }
+    }
+}
+
+extension UserDefaults {
+    func cgFloat(forKey key: String) -> CGFloat? {
+        if let value = object(forKey: key) as? CGFloat {
+            return value
+        } else if let value = object(forKey: key) as? Double {
+            return CGFloat(value)
+        }
+        return nil
     }
 }
 

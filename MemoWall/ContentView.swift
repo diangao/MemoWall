@@ -25,6 +25,7 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 MarkdownTextView(text: $text)
+                    .environmentObject(appDelegate)  // 显式传递 AppDelegate
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(8)
                     .background(

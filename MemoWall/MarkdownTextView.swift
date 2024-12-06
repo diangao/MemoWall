@@ -4,6 +4,7 @@ import AppKit
 struct MarkdownTextView: View {
     @Binding var text: String
     var isWidget: Bool
+    @EnvironmentObject private var appDelegate: AppDelegate
     
     init(text: Binding<String>, isWidget: Bool = false) {
         self._text = text
@@ -15,73 +16,138 @@ struct MarkdownTextView: View {
             MarkdownRenderedView(text: text, isWidget: true)
         } else {
             MacMarkdownTextView(text: $text)
+                .environmentObject(appDelegate)
         }
+    }
+}
+
+// 添加一个自定义的 NSTextStorage 子类
+class MarkdownTextStorage: NSTextStorage {
+    private var storage = NSMutableAttributedString()
+    var fontSize: CGFloat {
+        didSet {
+            if oldValue != fontSize {
+                applyStyles()
+            }
+        }
+    }
+    
+    init(fontSize: CGFloat) {
+        self.fontSize = fontSize
+        super.init()
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override var string: String {
+        return storage.string
+    }
+    
+    override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
+        return storage.attributes(at: location, effectiveRange: range)
+    }
+    
+    override func replaceCharacters(in range: NSRange, with str: String) {
+        print("Replacing characters in range: \(range) with string of length: \(str.count)")
+        beginEditing()
+        storage.replaceCharacters(in: range, with: str)
+        edited(.editedCharacters, range: range, changeInLength: str.count - range.length)
+        endEditing()
+        applyStyles()
+    }
+    
+    override func setAttributes(_ attrs: [NSAttributedString.Key : Any]?, range: NSRange) {
+        beginEditing()
+        storage.setAttributes(attrs, range: range)
+        edited(.editedAttributes, range: range, changeInLength: 0)
+        endEditing()
+    }
+    
+    private func applyStyles() {
+        print("Applying styles with font size: \(fontSize)")
+        let text = storage.string
+        let fullRange = NSRange(location: 0, length: length)
+        
+        // 重置所有样式
+        beginEditing()
+        
+        // 设置基础字体和颜色
+        let baseFont = NSFont.systemFont(ofSize: fontSize)
+        setAttributes([
+            .font: baseFont,
+            .foregroundColor: NSColor.textColor
+        ], range: fullRange)
+        
+        // 处理每一行
+        text.enumerateLines { line, _ in
+            let lineRange = (text as NSString).range(of: line)
+            
+            // 处理标题
+            if let headerLevel = self.getHeaderLevel(from: line) {
+                let headerSize = self.fontSize * (headerLevel == 1 ? 2.0 :
+                                               headerLevel == 2 ? 1.5 :
+                                               headerLevel == 3 ? 1.2 : 1.0)
+                let headerFont = NSFont.boldSystemFont(ofSize: headerSize)
+                self.addAttribute(.font, value: headerFont, range: lineRange)
+            }
+            
+            // 处理待办事项
+            if line.hasPrefix("□ ") || line.hasPrefix("☑ ") {
+                let checkboxRange = NSRange(location: lineRange.location, length: 2)
+                self.addAttribute(.foregroundColor, value: NSColor.systemGray, range: checkboxRange)
+            }
+        }
+        
+        endEditing()
+        
+        // 通知布局管理器重新布局
+        layoutManagers.forEach { manager in
+            manager.ensureLayout(for: manager.textContainers.first!)
+        }
+    }
+    
+    private func getHeaderLevel(from line: String) -> Int? {
+        let pattern = "^\\s*(#{1,6})\\s+"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return nil
+        }
+        
+        if let match = regex.firstMatch(in: line, options: [], range: NSRange(location: 0, length: line.count)) {
+            let hashRange = match.range(at: 1)
+            let hashCount = (line as NSString).substring(with: hashRange).count
+            return hashCount
+        }
+        return nil
+    }
+    
+    func updateFontSize(_ newSize: CGFloat) {
+        print("Updating font size from \(fontSize) to \(newSize)")
+        fontSize = newSize
     }
 }
 
 struct MacMarkdownTextView: NSViewRepresentable {
     @Binding var text: String
+    @EnvironmentObject private var appDelegate: AppDelegate
+    private var textStorage: MarkdownTextStorage?
     
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
-        let textView = NSTextView()
+    class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: MacMarkdownTextView
+        weak var textView: NSTextView?
         
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.documentView = textView
-        scrollView.autoresizingMask = [.width, .height]
+        init(_ parent: MacMarkdownTextView) {
+            self.parent = parent
+        }
         
-        textView.delegate = context.coordinator
-        textView.isRichText = true
-        textView.font = .systemFont(ofSize: 14)
-        textView.isEditable = true
-        textView.isSelectable = true
-        textView.allowsUndo = true
-        textView.backgroundColor = .clear
-        textView.drawsBackground = true
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
         
-        // 配置文本容器以支持自动换行
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.heightTracksTextView = false
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.containerSize = NSSize(
-            width: 0, // 这将使容器宽度跟随视图宽度
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        
-        // 配置文本视图的自适应行为
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.minSize = NSSize(width: 0, height: 0)
-        
-        // 设置合适的内边距
-        textView.textContainerInset = NSSize(width: 8, height: 8)
-        
-        // 启用自动布局
-        textView.translatesAutoresizingMaskIntoConstraints = true
-        
-        textView.string = text
-        context.coordinator.applyMarkdownStyling(textView)
-        
-        return scrollView
-    }
-    
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        guard let textView = nsView.documentView as? NSTextView else { return }
-        
-        // 更新文本容器的宽度以适应滚动视图
-        textView.textContainer?.containerSize = NSSize(
-            width: max(0, nsView.contentSize.width),
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        
-        if textView.string != text {
-            let selectedRanges = textView.selectedRanges
-            textView.string = text
-            textView.selectedRanges = selectedRanges
-            context.coordinator.applyMarkdownStyling(textView)
+        func textViewDidChangeSelection(_ notification: Notification) {
+            // 保持选择状态不变
         }
     }
     
@@ -89,157 +155,70 @@ struct MacMarkdownTextView: NSViewRepresentable {
         Coordinator(self)
     }
     
-    class Coordinator: NSObject, NSTextViewDelegate {
-        var parent: MacMarkdownTextView
-        private var isProcessingMarkdown = false
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autoresizingMask = [.width, .height]
         
-        init(_ parent: MacMarkdownTextView) {
-            self.parent = parent
-            super.init()
+        // 创建文本存储和布局系统
+        let storage = MarkdownTextStorage(fontSize: appDelegate.fontSize)
+        textStorage = storage
+        
+        let layoutManager = NSLayoutManager()
+        storage.addLayoutManager(layoutManager)
+        
+        let textContainer = NSTextContainer()
+        layoutManager.addTextContainer(textContainer)
+        
+        // 配置文本容器
+        textContainer.widthTracksTextView = true
+        textContainer.containerSize = NSSize(
+            width: scrollView.contentSize.width,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        
+        // 创建和配置文本视图
+        let textView = NSTextView(frame: .zero, textContainer: textContainer)
+        context.coordinator.textView = textView
+        textView.delegate = context.coordinator
+        
+        textView.isRichText = true
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.backgroundColor = .clear
+        textView.drawsBackground = true
+        textView.textContainerInset = NSSize(width: 16, height: 16)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        
+        scrollView.documentView = textView
+        
+        // 设置初始文本
+        if !text.isEmpty {
+            storage.replaceCharacters(in: NSRange(location: 0, length: 0), with: text)
         }
         
-        func textDidChange(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else { return }
-            guard !isProcessingMarkdown else { return }
-            
-            isProcessingMarkdown = true
-            defer { isProcessingMarkdown = false }
-            
-            let currentLineRange = getCurrentLineRange(textView)
-            let currentLine = (textView.string as NSString).substring(with: currentLineRange)
-            
-            var newLine = currentLine
-            
-            if currentLine.contains("[] ") {
-                newLine = newLine.replacingOccurrences(of: "[] ", with: "□ ")
-            } else if currentLine.contains("[x] ") || currentLine.contains("[X] ") {
-                newLine = newLine.replacingOccurrences(of: "[x] ", with: "☑ ", options: .caseInsensitive)
-            }
-            
-            if newLine != currentLine {
-                replaceText(textView, range: currentLineRange, with: newLine)
-            }
-            
-            parent.text = textView.string
-            applyMarkdownStyling(textView)
+        return scrollView
+    }
+    
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let textView = nsView.documentView as? NSTextView,
+              let storage = textStorage else { return }
+        
+        // 更新字体大小
+        if storage.fontSize != appDelegate.fontSize {
+            print("Updating font size to: \(appDelegate.fontSize)")
+            storage.updateFontSize(appDelegate.fontSize)
         }
         
-        private func getCurrentLineRange(_ textView: NSTextView) -> NSRange {
-            let selectedRange = textView.selectedRange()
-            return (textView.string as NSString).lineRange(for: NSRange(location: selectedRange.location, length: 0))
-        }
-        
-        private func replaceText(_ textView: NSTextView, range: NSRange, with newText: String) {
-            let cursorPosition = textView.selectedRange().location
-            textView.replaceCharacters(in: range, with: newText)
-            
-            let lengthDifference = range.length - newText.count
-            let newPosition = max(range.location, cursorPosition - lengthDifference)
-            textView.setSelectedRange(NSRange(location: newPosition, length: 0))
-        }
-        
-        // 解析行中的待办事项标记
-        private func getTodoInfo(_ line: String) -> (hasTodo: Bool, todoRange: NSRange, remainingText: String) {
-            let pattern = "^\\s*(□|☑)\\s"
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-                return (false, NSRange(location: 0, length: 0), line)
-            }
-            
-            if let match = regex.firstMatch(in: line, options: [], range: NSRange(location: 0, length: line.count)) {
-                let todoRange = match.range
-                let remainingText = (line as NSString).substring(from: todoRange.location + todoRange.length)
-                return (true, todoRange, remainingText)
-            }
-            
-            return (false, NSRange(location: 0, length: 0), line)
-        }
-        
-        // 解析行中的标题标记
-        private func getHeaderInfo(_ text: String) -> (isHeader: Bool, level: Int, hashRange: NSRange, contentRange: NSRange) {
-            let pattern = "^\\s*(#+)\\s+"
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-                return (false, 0, NSRange(location: 0, length: 0), NSRange(location: 0, length: 0))
-            }
-            
-            if let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.count)) {
-                let hashRange = match.range(at: 1)  // 获取#号的范围
-                let fullMatchRange = match.range    // 获取包含空格的完整范围
-                let level = hashRange.length        // #的数量就是标题级别
-                
-                // 计算内容的范围
-                let contentStart = fullMatchRange.location + fullMatchRange.length
-                let contentLength = text.count - contentStart
-                let contentRange = NSRange(location: contentStart, length: contentLength)
-                
-                return (true, level, hashRange, contentRange)
-            }
-            
-            return (false, 0, NSRange(location: 0, length: 0), NSRange(location: 0, length: 0))
-        }
-        
-        func applyMarkdownStyling(_ textView: NSTextView) {
-            let storage = textView.textStorage!
-            let fullRange = NSRange(location: 0, length: storage.length)
-            
-            // 重置所有样式
-            storage.removeAttribute(.font, range: fullRange)
-            storage.removeAttribute(.foregroundColor, range: fullRange)
-            storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
-            storage.addAttribute(.foregroundColor, value: NSColor.textColor, range: fullRange)
-            
-            let text = storage.string
-            let lines = text.components(separatedBy: .newlines)
-            var currentLocation = 0
-            
-            for line in lines {
-                let lineLength = line.count
-                guard lineLength > 0 else {
-                    currentLocation += 1
-                    continue
-                }
-                
-                // 先处理待办事项
-                let todoInfo = getTodoInfo(line)
-                var textToCheck = todoInfo.remainingText
-                var headerStartOffset = todoInfo.hasTodo ? todoInfo.todoRange.location + todoInfo.todoRange.length : 0
-                
-                // 再处理标题
-                let headerInfo = getHeaderInfo(textToCheck)
-                if headerInfo.isHeader {
-                    // 计算实际的标题范围（考虑到待办事项的偏移）
-                    let actualHashRange = NSRange(
-                        location: currentLocation + headerStartOffset + headerInfo.hashRange.location,
-                        length: headerInfo.hashRange.length
-                    )
-                    
-                    // 删除#号和后面的空格
-                    let attributedString = NSMutableAttributedString(string: storage.string)
-                    let rangeToDelete = NSRange(
-                        location: actualHashRange.location,
-                        length: headerInfo.contentRange.location - headerInfo.hashRange.location
-                    )
-                    attributedString.deleteCharacters(in: rangeToDelete)
-                    storage.setAttributedString(attributedString)
-                    
-                    // 更新行的范围（因为删除了字符）
-                    lineLength -= rangeToDelete.length
-                    
-                    // 设置标题样式
-                    let fontSize: CGFloat
-                    switch headerInfo.level {
-                    case 1: fontSize = 28
-                    case 2: fontSize = 21
-                    case 3: fontSize = 16.8
-                    default: fontSize = 14
-                    }
-                    
-                    let titleRange = NSRange(location: currentLocation, length: lineLength)
-                    let font = NSFont.systemFont(ofSize: fontSize, weight: headerInfo.level <= 3 ? .bold : .regular)
-                    storage.addAttribute(.font, value: font, range: titleRange)
-                }
-                
-                currentLocation += lineLength + (currentLocation < storage.length ? 1 : 0)
-            }
+        // 更新文本内容（如果需要）
+        if textView.string != text {
+            let selectedRanges = textView.selectedRanges
+            storage.replaceCharacters(in: NSRange(location: 0, length: storage.length), with: text)
+            textView.selectedRanges = selectedRanges
         }
     }
 }
