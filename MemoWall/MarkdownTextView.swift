@@ -29,6 +29,7 @@ struct MacMarkdownTextView: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.documentView = textView
+        scrollView.autoresizingMask = [.width, .height]
         
         textView.delegate = context.coordinator
         textView.isRichText = true
@@ -36,20 +37,30 @@ struct MacMarkdownTextView: NSViewRepresentable {
         textView.isEditable = true
         textView.isSelectable = true
         textView.allowsUndo = true
-        textView.backgroundColor = .white
+        textView.backgroundColor = .clear
         textView.drawsBackground = true
         
+        // 配置文本容器以支持自动换行
         textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = false
+        textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.containerSize = NSSize(
-            width: scrollView.contentSize.width,
+            width: 0, // 这将使容器宽度跟随视图宽度
             height: CGFloat.greatestFiniteMagnitude
         )
         
+        // 配置文本视图的自适应行为
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 0, height: 0)
         
-        textView.textContainerInset = NSSize(width: 10, height: 10)
+        // 设置合适的内边距
+        textView.textContainerInset = NSSize(width: 8, height: 8)
+        
+        // 启用自动布局
+        textView.translatesAutoresizingMaskIntoConstraints = true
         
         textView.string = text
         context.coordinator.applyMarkdownStyling(textView)
@@ -59,6 +70,13 @@ struct MacMarkdownTextView: NSViewRepresentable {
     
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         guard let textView = nsView.documentView as? NSTextView else { return }
+        
+        // 更新文本容器的宽度以适应滚动视图
+        textView.textContainer?.containerSize = NSSize(
+            width: max(0, nsView.contentSize.width),
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text

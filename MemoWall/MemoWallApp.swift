@@ -55,7 +55,7 @@ struct MemoWallApp: App {
                     ContentView()
                         .modelContainer(container)
                         .environmentObject(appDelegate)
-                        .frame(minWidth: 400, minHeight: 300)
+                        .frame(minWidth: 300, minHeight: 200)
                 }
             }
             .onAppear {
@@ -112,6 +112,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             window.standardWindowButton(.zoomButton)?.isHidden = true
             window.standardWindowButton(.miniaturizeButton)?.isHidden = true
             
+            // 设置窗口样式，确保边框可见
+            window.backgroundColor = NSColor.windowBackgroundColor
+            window.isOpaque = false
+            window.hasShadow = true
+            
             // 创建固定按钮
             let pinButton = NSButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
             pinButton.bezelStyle = .regularSquare
@@ -130,11 +135,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             if let titlebarView = window.standardWindowButton(.closeButton)?.superview {
                 titlebarView.addSubview(pinButton)
                 
-                // 设置按钮位置在右上角
+                // 设置按钮位置在右上角，调整位置避免冲突
                 pinButton.translatesAutoresizingMaskIntoConstraints = false
                 NSLayoutConstraint.activate([
                     pinButton.centerYAnchor.constraint(equalTo: titlebarView.centerYAnchor),
-                    pinButton.trailingAnchor.constraint(equalTo: titlebarView.trailingAnchor, constant: -8)
+                    pinButton.trailingAnchor.constraint(equalTo: titlebarView.trailingAnchor, constant: -30) // 将按钮向左移动更多距离
                 ])
             }
             

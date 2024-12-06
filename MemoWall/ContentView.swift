@@ -25,15 +25,14 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 MarkdownTextView(text: $text)
-                    .frame(minWidth: 400, minHeight: 300)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding()
+                    .padding(8)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 8)
                             .fill(Color(NSColor.textBackgroundColor))
                             .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
                     )
-                    .padding()
+                    .padding(8)
                     .onChange(of: text) { _, newValue in
                         // 避免重复保存相同的文本
                         guard newValue != lastSavedText else { return }
@@ -97,7 +96,7 @@ struct ContentView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 500, minHeight: 400)
+        .frame(minWidth: 300, minHeight: 200) // 调整最小尺寸以匹配主窗口
     }
     
     private func setupWindow() {
