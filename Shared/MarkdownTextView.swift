@@ -19,7 +19,7 @@ private func getTodoInfo(_ line: String) -> (hasTodo: Bool, todoRange: NSRange, 
 
 private func getHeaderInfo(_ text: String) -> (isHeader: Bool, level: Int, hashRange: NSRange, contentRange: NSRange) {
     // 修改正则表达式，使其能匹配标题标记，不管前面是否有 todo 标记
-    let pattern = "^\\s*(#{1,6})\\s*"
+    let pattern = "^(?:\\s*(?:□|☑)\\s+)?(#{1,6})\\s+"
     guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
         return (false, 0, NSRange(location: 0, length: 0), NSRange(location: 0, length: 0))
     }
@@ -56,58 +56,6 @@ private func getRangeOfLine(at lineNumber: Int, in text: String) -> NSRange {
     }
     
     return NSRange(location: 0, length: 0)
-}
-
-// 日期处理辅助函数
-private func getDateInfo(_ text: String) -> (hasDate: Bool, dateRange: NSRange, formattedDate: String) {
-    let dateFormatter = DateFormatter()
-    dateFormatter.dateFormat = "MMM d, yyyy"
-    let calendar = Calendar.current
-    let today = Date()
-    
-    // 匹配 @today, @tmr, @yesterday，后面必须跟空格
-    if let match = text.range(of: "@(today|tmr|yesterday)\\s", options: .regularExpression) {
-        let keyword = text[match].dropFirst().trimmingCharacters(in: .whitespaces) // 去掉@和空格
-        let date: Date
-        switch keyword {
-        case "today":
-            date = today
-        case "tmr":
-            date = calendar.date(byAdding: .day, value: 1, to: today)!
-        case "yesterday":
-            date = calendar.date(byAdding: .day, value: -1, to: today)!
-        default:
-            return (false, NSRange(location: 0, length: 0), "")
-        }
-        let nsRange = NSRange(match, in: text)
-        return (true, nsRange, dateFormatter.string(from: date))
-    }
-    
-    // 匹配 @dec 18 格式，必须以空格结尾
-    let monthPattern = "@(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\d{1,2})\\s"
-    if let match = try? NSRegularExpression(pattern: monthPattern, options: [.caseInsensitive])
-        .firstMatch(in: text, range: NSRange(location: 0, length: text.count)) {
-        let monthStr = (text as NSString).substring(with: match.range(at: 1))
-        let dayStr = (text as NSString).substring(with: match.range(at: 2))
-        
-        if let day = Int(dayStr) {
-            var components = calendar.dateComponents([.year], from: today)
-            components.day = day
-            
-            // 设置月份
-            let months = ["jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-                         "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12]
-            if let month = months[monthStr.lowercased()] {
-                components.month = month
-                
-                if let date = calendar.date(from: components) {
-                    return (true, match.range, dateFormatter.string(from: date))
-                }
-            }
-        }
-    }
-    
-    return (false, NSRange(location: 0, length: 0), "")
 }
 
 struct MarkdownTextView: NSViewRepresentable {
@@ -232,15 +180,6 @@ struct MarkdownTextView: NSViewRepresentable {
             
             var newLine = currentLine
             
-            // 处理日期快捷输入
-            let dateInfo = getDateInfo(newLine)
-            if dateInfo.hasDate {
-                let dateRange = NSRange(location: currentLineRange.location + dateInfo.dateRange.location,
-                                      length: dateInfo.dateRange.length)
-                replaceText(textView, range: dateRange, with: dateInfo.formattedDate)
-                newLine = (textView.string as NSString).substring(with: currentLineRange)
-            }
-            
             // 处理待办事项标记
             if currentLine.contains("[] ") {
                 newLine = newLine.replacingOccurrences(of: "[] ", with: "□ ")
@@ -260,16 +199,9 @@ struct MarkdownTextView: NSViewRepresentable {
                 
                 // 如果输入了空格，则删除标题标记但保持样式
                 if let lastChar = newLine.last, lastChar == " " {
-                    // 计算要删除的范围，包括标题标记和后面的空格
                     let hashRange = NSRange(location: currentLineRange.location + headerInfo.hashRange.location,
-                                         length: headerInfo.hashRange.length)
-                    let spaceRange = NSRange(location: hashRange.location + hashRange.length,
-                                          length: 1)
-                    
-                    // 先删除空格，再删除标题标记
-                    replaceText(textView, range: spaceRange, with: "")
+                                         length: headerInfo.hashRange.length + 1)
                     replaceText(textView, range: hashRange, with: "")
-                    return
                 }
             }
             
@@ -290,26 +222,11 @@ struct MarkdownTextView: NSViewRepresentable {
         
         private func replaceText(_ textView: NSTextView, range: NSRange, with newText: String) {
             let cursorPosition = textView.selectedRange().location
-            let selectionLength = textView.selectedRange().length
-            
             textView.replaceCharacters(in: range, with: newText)
             
-            // 计算新的光标位置
-            let newPosition: Int
-            if cursorPosition < range.location {
-                // 光标在替换范围之前，保持不变
-                newPosition = cursorPosition
-            } else if cursorPosition <= range.location + range.length {
-                // 光标在替换范围内，移动到替换文本之后
-                newPosition = range.location + newText.count
-            } else {
-                // 光标在替换范围之后，根据文本长度差异调整位置
-                let lengthDifference = range.length - newText.count
-                newPosition = cursorPosition - lengthDifference
-            }
-            
-            // 保持选中状态（如果有的话）
-            textView.setSelectedRange(NSRange(location: newPosition, length: selectionLength))
+            let lengthDifference = range.length - newText.count
+            let newPosition = max(range.location, cursorPosition - lengthDifference)
+            textView.setSelectedRange(NSRange(location: newPosition, length: 0))
         }
         
         func applyMarkdownStyling(_ textView: NSTextView) {
