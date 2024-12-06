@@ -236,22 +236,37 @@ struct MarkdownTextView: NSViewRepresentable {
             
             print("Processing line \(currentLineNumber): '\(currentLine)'")
             
-            // Check if current line is empty and was previously a header
-            if currentLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            // 获取当前行的前一个状态
+            let selectedRange = textView.selectedRange()
+            let lastChar = selectedRange.location > 0 ? (text as NSString).substring(with: NSRange(location: selectedRange.location - 1, length: 1)) : ""
+            let isNewLine = lastChar == "\n"
+            
+            // 检查当前行是否为空
+            let isEmptyLine = currentLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            
+            if isNewLine {
+                // 如果是按回车键插入新行
+                var updatedLevels: [Int: Int] = [:]
+                for (line, level) in lineHeaderLevels where line >= currentLineNumber {
+                    updatedLevels[line + 1] = level // 将标题级别向下移动一行
+                    print("Moving header level \(level) from line \(line) to \(line + 1)")
+                }
+                // 更新标题级别映射
+                for (line, level) in updatedLevels {
+                    lineHeaderLevels[line] = level
+                }
+                // 清除当前行的标题级别（因为它是新插入的空行）
+                lineHeaderLevels.removeValue(forKey: currentLineNumber)
+            } else if isEmptyLine {
+                // 如果当前行被清空（通过删除内容），移除其标题级别
                 if lineHeaderLevels[currentLineNumber] != nil {
-                    print("Removing header level for empty line \(currentLineNumber)")
+                    print("Removing header level for cleared line \(currentLineNumber)")
                     lineHeaderLevels.removeValue(forKey: currentLineNumber)
-                    applyMarkdownStyling(textView)
-                    return
                 }
             }
             
-            // 检查是否刚输入了空格或换行
-            let selectedRange = textView.selectedRange()
-            let lastChar = selectedRange.location > 0 ? (text as NSString).substring(with: NSRange(location: selectedRange.location - 1, length: 1)) : ""
-            let isAtLineEnd = lastChar == "\n"
-            
-            if lastChar == " " || isAtLineEnd {
+            // 检查是否刚输入了空格
+            if lastChar == " " {
                 // 检查并处理日期标记
                 let dateInfo = getDateInfo(currentLine.trimmingCharacters(in: .whitespaces))
                 if dateInfo.hasDate {
@@ -261,10 +276,8 @@ struct MarkdownTextView: NSViewRepresentable {
                         let dateRange = NSRange(location: currentLineRange.location + startOffset,
                                              length: dateInfo.dateRange.length)
                         replaceText(textView, range: dateRange, with: dateInfo.formattedDate)
-                        if !isAtLineEnd {
-                            // 如果不是在行尾，添加空格
-                            replaceText(textView, range: NSRange(location: dateRange.location + dateInfo.formattedDate.count, length: 0), with: " ")
-                        }
+                        // 如果不是在行尾，添加空格
+                        replaceText(textView, range: NSRange(location: dateRange.location + dateInfo.formattedDate.count, length: 0), with: " ")
                         parent.text = textView.string
                         applyMarkdownStyling(textView)
                         return
@@ -283,13 +296,9 @@ struct MarkdownTextView: NSViewRepresentable {
             
             // 检查标题标记
             let headerInfo = getHeaderInfo(currentLine)
-            let isHeader = headerInfo.isHeader
-            let headerLevel = headerInfo.level
-            
-            // 如果是标题行
-            if isHeader {
-                print("Found header level \(headerLevel) at line \(currentLineNumber)")
-                self.lineHeaderLevels[currentLineNumber] = headerLevel
+            if headerInfo.isHeader {
+                print("Found header level \(headerInfo.level) at line \(currentLineNumber)")
+                self.lineHeaderLevels[currentLineNumber] = headerInfo.level
                 
                 // 如果输入了空格，则删除标题标记但保持样式
                 if lastChar == " " {
@@ -330,17 +339,22 @@ struct MarkdownTextView: NSViewRepresentable {
             storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
             
             // 遍历所有标题行并应用样式
-            for (lineNumber, headerLevel) in self.lineHeaderLevels {
-                let lineRange = getRangeOfLine(at: lineNumber, in: text)
-                if lineRange.length > 0 {
-                    let fontSize = HeaderStyle.fontSize(for: headerLevel)
-                    let font = NSFont.boldSystemFont(ofSize: fontSize)
-                    storage.addAttribute(.font, value: font, range: lineRange)
-                    
-                    let line = (text as NSString).substring(with: lineRange)
-                    print("Applied style - Line \(lineNumber): '\(line)' with level \(headerLevel)")
+            var currentLine = 0
+            text.enumerateLines { line, _ in
+                // 如果这一行有标题级别，应用相应的样式
+                if let headerLevel = self.lineHeaderLevels[currentLine] {
+                    let lineRange = getRangeOfLine(at: currentLine, in: text)
+                    if lineRange.length > 0 {
+                        let fontSize = HeaderStyle.fontSize(for: headerLevel)
+                        let font = NSFont.boldSystemFont(ofSize: fontSize)
+                        storage.addAttribute(.font, value: font, range: lineRange)
+                        print("Applied style - Line \(currentLine): '\(line)' with level \(headerLevel)")
+                    }
                 }
+                currentLine += 1
             }
+            
+            print("Current header levels:", self.lineHeaderLevels)
             
             // 为日期添加蓝色样式
             let datePattern = "(\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{1,2},\\s+\\d{4}\\b)"

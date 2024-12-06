@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		673434D12D039C0D00FE6B25 /* SharedMarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673434D02D039C0D00FE6B25 /* SharedMarkdownTextView.swift */; };
+		673434D22D039C0D00FE6B25 /* SharedMarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673434D02D039C0D00FE6B25 /* SharedMarkdownTextView.swift */; };
 		673A6A6A2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */; };
-		673A6A6B2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */; };
 		673A6A6C2CFBC69E00DD0B02 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A662CFBC69E00DD0B02 /* Item.swift */; };
 		673A6A6D2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */; };
-		673A6A6E2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */; };
 		673A6A6F2CFBC69E00DD0B02 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A662CFBC69E00DD0B02 /* Item.swift */; };
 		673A6A742CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */; };
 		673A6A752CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */; };
@@ -67,9 +67,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		673434D02D039C0D00FE6B25 /* SharedMarkdownTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedMarkdownTextView.swift; sourceTree = "<group>"; };
 		673A6A512CFBB01700DD0B02 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		673A6A662CFBC69E00DD0B02 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
-		673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownTextView.swift; sourceTree = "<group>"; };
 		673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedDataManager.swift; sourceTree = "<group>"; };
 		673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownRenderedView.swift; sourceTree = "<group>"; };
 		676ADC772CF2DDF500C48FBD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -140,9 +140,9 @@
 		673A6A692CFBC69E00DD0B02 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				673434D02D039C0D00FE6B25 /* SharedMarkdownTextView.swift */,
 				673A6A732CFBCBA300DD0B02 /* MarkdownRenderedView.swift */,
 				673A6A662CFBC69E00DD0B02 /* Item.swift */,
-				673A6A672CFBC69E00DD0B02 /* MarkdownTextView.swift */,
 				673A6A682CFBC69E00DD0B02 /* SharedDataManager.swift */,
 			);
 			path = Shared;
@@ -391,7 +391,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				673A6A6D2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */,
-				673A6A6E2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */,
+				673434D22D039C0D00FE6B25 /* SharedMarkdownTextView.swift in Sources */,
 				673A6A6F2CFBC69E00DD0B02 /* Item.swift in Sources */,
 				673A6A752CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */,
 			);
@@ -404,7 +404,7 @@
 				676ADC782CF2DDF500C48FBD /* ContentView.swift in Sources */,
 				673A6A6A2CFBC69E00DD0B02 /* SharedDataManager.swift in Sources */,
 				673A6A742CFBCBA300DD0B02 /* MarkdownRenderedView.swift in Sources */,
-				673A6A6B2CFBC69E00DD0B02 /* MarkdownTextView.swift in Sources */,
+				673434D12D039C0D00FE6B25 /* SharedMarkdownTextView.swift in Sources */,
 				673A6A6C2CFBC69E00DD0B02 /* Item.swift in Sources */,
 				67EC09BA2CE6D82B00B2902F /* MemoWallApp.swift in Sources */,
 			);
