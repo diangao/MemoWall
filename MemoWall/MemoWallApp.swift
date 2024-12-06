@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import Combine
 
 @main
 struct MemoWallApp: App {
@@ -53,6 +54,7 @@ struct MemoWallApp: App {
                 } else if let container = modelContainer {
                     ContentView()
                         .modelContainer(container)
+                        .environmentObject(appDelegate)
                         .frame(minWidth: 400, minHeight: 300)
                 }
             }
@@ -87,66 +89,89 @@ struct MemoWallApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     static private(set) var shared: AppDelegate!
     private var mainWindow: NSWindow?
+    @Published var isPinned: Bool = false {
+        didSet {
+            if let window = NSApp.windows.first {
+                configureWindow(window)
+            }
+        }
+    }
     
     override init() {
         super.init()
-        AppDelegate.shared = self
+        Self.shared = self
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        
-        // 监听窗口创建
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleWindowDidAppear),
-            name: NSNotification.Name("WindowDidAppear"),
-            object: nil
-        )
+        if let window = NSApp.windows.first {
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.standardWindowButton(.zoomButton)?.isHidden = true
+            window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            
+            // 创建固定按钮
+            let pinButton = NSButton(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+            pinButton.bezelStyle = .regularSquare
+            pinButton.isBordered = false
+            pinButton.image = NSImage(systemSymbolName: "pin", accessibilityDescription: "Pin window")
+            pinButton.imagePosition = .imageOnly
+            pinButton.action = #selector(togglePinWindow)
+            pinButton.target = self
+            
+            // 设置按钮颜色
+            if let cell = pinButton.cell as? NSButtonCell {
+                cell.imageScaling = .scaleProportionallyDown
+            }
+            
+            // 将按钮添加到窗口右上角
+            if let titlebarView = window.standardWindowButton(.closeButton)?.superview {
+                titlebarView.addSubview(pinButton)
+                
+                // 设置按钮位置在右上角
+                pinButton.translatesAutoresizingMaskIntoConstraints = false
+                NSLayoutConstraint.activate([
+                    pinButton.centerYAnchor.constraint(equalTo: titlebarView.centerYAnchor),
+                    pinButton.trailingAnchor.constraint(equalTo: titlebarView.trailingAnchor, constant: -8)
+                ])
+            }
+            
+            configureWindow(window)
+        }
     }
     
-    @objc private func handleWindowDidAppear() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+    @objc private func togglePinWindow() {
+        isPinned.toggle()
+        
+        // 更新按钮图标
+        if let window = NSApp.windows.first,
+           let titlebarView = window.standardWindowButton(.closeButton)?.superview,
+           let pinButton = titlebarView.subviews.first(where: { ($0 as? NSButton)?.action == #selector(togglePinWindow) }) as? NSButton {
+            pinButton.image = NSImage(systemSymbolName: isPinned ? "pin.fill" : "pin", accessibilityDescription: isPinned ? "Unpin window" : "Pin window")
             
-            // 如果已经有主窗口，直接返回
-            if self.mainWindow?.isVisible == true {
-                return
+            // 设置图标颜色
+            if isPinned {
+                pinButton.contentTintColor = NSColor(red: 52/255, green: 199/255, blue: 89/255, alpha: 1.0)
+            } else {
+                pinButton.contentTintColor = .secondaryLabelColor
             }
-            
-            // 找到第一个主窗口
-            if let window = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
-                self.mainWindow = window
-                
-                // 设置窗口样式
-                window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-                window.titleVisibility = .hidden
-                window.titlebarAppearsTransparent = true
-                window.standardWindowButton(.zoomButton)?.isHidden = true
-                
-                // 设置窗口大小和位置
-                let screenSize = NSScreen.main?.visibleFrame ?? .zero
-                let windowSize = NSSize(width: 800, height: 600)
-                let windowOrigin = NSPoint(
-                    x: (screenSize.width - windowSize.width) / 2,
-                    y: (screenSize.height - windowSize.height) / 2
-                )
-                window.setFrame(NSRect(origin: windowOrigin, size: windowSize), display: true)
-                
-                // 关闭其他所有主窗口
-                NSApp.windows.forEach { otherWindow in
-                    if otherWindow !== window && otherWindow.identifier?.rawValue == "main" {
-                        otherWindow.close()
-                    }
-                }
-                
-                // 显示并激活窗口
-                window.makeKeyAndOrderFront(nil)
-                NSApp.activate(ignoringOtherApps: true)
-            }
+        }
+    }
+    
+    private func configureWindow(_ window: NSWindow) {
+        if isPinned {
+            // 保持当前位置和大小，只禁用调整
+            window.styleMask.remove(.resizable)
+            window.styleMask.remove(.miniaturizable)
+            window.isMovable = false
+            window.isMovableByWindowBackground = false
+        } else {
+            window.styleMask.insert(.resizable)
+            window.styleMask.insert(.miniaturizable)
+            window.isMovable = true
+            window.isMovableByWindowBackground = true
         }
     }
     

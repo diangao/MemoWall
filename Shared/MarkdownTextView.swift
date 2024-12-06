@@ -19,7 +19,7 @@ private func getTodoInfo(_ line: String) -> (hasTodo: Bool, todoRange: NSRange, 
 
 private func getHeaderInfo(_ text: String) -> (isHeader: Bool, level: Int, hashRange: NSRange, contentRange: NSRange) {
     // 修改正则表达式，使其能匹配标题标记，不管前面是否有 todo 标记
-    let pattern = "^(?:\\s*(?:□|☑)\\s+)?(#{1,6})\\s+"
+    let pattern = "^\\s*(#{1,6})\\s*"
     guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
         return (false, 0, NSRange(location: 0, length: 0), NSRange(location: 0, length: 0))
     }
@@ -260,9 +260,16 @@ struct MarkdownTextView: NSViewRepresentable {
                 
                 // 如果输入了空格，则删除标题标记但保持样式
                 if let lastChar = newLine.last, lastChar == " " {
+                    // 计算要删除的范围，包括标题标记和后面的空格
                     let hashRange = NSRange(location: currentLineRange.location + headerInfo.hashRange.location,
-                                         length: headerInfo.hashRange.length + 1)
+                                         length: headerInfo.hashRange.length)
+                    let spaceRange = NSRange(location: hashRange.location + hashRange.length,
+                                          length: 1)
+                    
+                    // 先删除空格，再删除标题标记
+                    replaceText(textView, range: spaceRange, with: "")
                     replaceText(textView, range: hashRange, with: "")
+                    return
                 }
             }
             
@@ -283,11 +290,26 @@ struct MarkdownTextView: NSViewRepresentable {
         
         private func replaceText(_ textView: NSTextView, range: NSRange, with newText: String) {
             let cursorPosition = textView.selectedRange().location
+            let selectionLength = textView.selectedRange().length
+            
             textView.replaceCharacters(in: range, with: newText)
             
-            let lengthDifference = range.length - newText.count
-            let newPosition = max(range.location, cursorPosition - lengthDifference)
-            textView.setSelectedRange(NSRange(location: newPosition, length: 0))
+            // 计算新的光标位置
+            let newPosition: Int
+            if cursorPosition < range.location {
+                // 光标在替换范围之前，保持不变
+                newPosition = cursorPosition
+            } else if cursorPosition <= range.location + range.length {
+                // 光标在替换范围内，移动到替换文本之后
+                newPosition = range.location + newText.count
+            } else {
+                // 光标在替换范围之后，根据文本长度差异调整位置
+                let lengthDifference = range.length - newText.count
+                newPosition = cursorPosition - lengthDifference
+            }
+            
+            // 保持选中状态（如果有的话）
+            textView.setSelectedRange(NSRange(location: newPosition, length: selectionLength))
         }
         
         func applyMarkdownStyling(_ textView: NSTextView) {
