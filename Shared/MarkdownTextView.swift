@@ -59,50 +59,67 @@ private func getRangeOfLine(at lineNumber: Int, in text: String) -> NSRange {
 }
 
 // 日期处理辅助函数
-private func getDateInfo(_ text: String) -> (hasDate: Bool, dateRange: NSRange, formattedDate: String) {
-    let dateFormatter = DateFormatter()
-    dateFormatter.dateFormat = "MMM d, yyyy"
-    let calendar = Calendar.current
-    let today = Date()
+private func getDateInfo(_ line: String) -> (hasDate: Bool, dateRange: NSRange, formattedDate: String) {
+    // 支持 @today, @tmr, @yesterday，后面必须跟空格或是行尾
+    let shortcutPattern = "@(today|tmr|tmrw|yestd|yesterday)$"
+    // 支持 @月份 日期，如 @dec 18，后面必须跟空格或是行尾
+    let monthPattern = "@(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\d{1,2})$"
     
-    // 匹配 @today, @tmr, @yesterday，后面必须跟空格
-    if let match = text.range(of: "@(today|tmr|yesterday)\\s", options: .regularExpression) {
-        let keyword = text[match].dropFirst().trimmingCharacters(in: .whitespaces) // 去掉@和空格
-        let date: Date
-        switch keyword {
-        case "today":
-            date = today
-        case "tmr":
-            date = calendar.date(byAdding: .day, value: 1, to: today)!
-        case "yesterday":
-            date = calendar.date(byAdding: .day, value: -1, to: today)!
-        default:
-            return (false, NSRange(location: 0, length: 0), "")
+    if let regex = try? NSRegularExpression(pattern: shortcutPattern, options: [.caseInsensitive]) {
+        if let match = regex.firstMatch(in: line.trimmingCharacters(in: .whitespaces), options: [], range: NSRange(location: 0, length: line.trimmingCharacters(in: .whitespaces).count)) {
+            let dateText = (line.trimmingCharacters(in: .whitespaces) as NSString).substring(with: match.range(at: 1))
+            let date: Date
+            switch dateText.lowercased() {
+            case "today":
+                date = Date()
+            case "tmr", "tmrw":
+                date = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+            case "yestd", "yesterday":
+                date = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+            default:
+                return (false, NSRange(location: 0, length: 0), "")
+            }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d, yyyy"
+            
+            // 找到原始字符串中的 @ 符号位置
+            if let atSignRange = line.range(of: "@") {
+                let startIndex = line.distance(from: line.startIndex, to: atSignRange.lowerBound)
+                let length = dateText.count + 1 // +1 for @ symbol
+                return (true, NSRange(location: startIndex, length: length), formatter.string(from: date))
+            }
         }
-        let nsRange = NSRange(match, in: text)
-        return (true, nsRange, dateFormatter.string(from: date))
     }
     
-    // 匹配 @dec 18 格式，必须以空格结尾
-    let monthPattern = "@(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\d{1,2})\\s"
-    if let match = try? NSRegularExpression(pattern: monthPattern, options: [.caseInsensitive])
-        .firstMatch(in: text, range: NSRange(location: 0, length: text.count)) {
-        let monthStr = (text as NSString).substring(with: match.range(at: 1))
-        let dayStr = (text as NSString).substring(with: match.range(at: 2))
-        
-        if let day = Int(dayStr) {
-            var components = DateComponents()
-            components.year = calendar.component(.year, from: today)
+    if let regex = try? NSRegularExpression(pattern: monthPattern, options: [.caseInsensitive]) {
+        if let match = regex.firstMatch(in: line.trimmingCharacters(in: .whitespaces), options: [], range: NSRange(location: 0, length: line.trimmingCharacters(in: .whitespaces).count)) {
+            let monthText = (line.trimmingCharacters(in: .whitespaces) as NSString).substring(with: match.range(at: 1))
+            let dayText = (line.trimmingCharacters(in: .whitespaces) as NSString).substring(with: match.range(at: 2))
             
-            // 将月份字符串转换为月份数字
-            let monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-            if let month = monthNames.firstIndex(of: monthStr.lowercased()) {
-                components.month = month + 1
-                components.day = day
-                
-                if let date = calendar.date(from: components) {
-                    return (true, match.range, dateFormatter.string(from: date))
-                }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM"
+            
+            guard let month = formatter.date(from: monthText),
+                  let day = Int(dayText),
+                  day >= 1 && day <= 31 else {
+                return (false, NSRange(location: 0, length: 0), "")
+            }
+            
+            var components = Calendar.current.dateComponents([.year], from: Date())
+            components.month = Calendar.current.component(.month, from: month)
+            components.day = day
+            
+            guard let date = Calendar.current.date(from: components) else {
+                return (false, NSRange(location: 0, length: 0), "")
+            }
+            
+            formatter.dateFormat = "MMM d, yyyy"
+            
+            // 找到原始字符串中的 @ 符号位置
+            if let atSignRange = line.range(of: "@") {
+                let startIndex = line.distance(from: line.startIndex, to: atSignRange.lowerBound)
+                let endIndex = line.distance(from: line.startIndex, to: line.index(atSignRange.lowerBound, offsetBy: monthText.count + dayText.count + 2)) // +2 for @ and space
+                return (true, NSRange(location: startIndex, length: endIndex - startIndex), formatter.string(from: date))
             }
         }
     }
@@ -230,14 +247,30 @@ struct MarkdownTextView: NSViewRepresentable {
                 }
             }
             
-            // 检查并处理日期标记
-            let dateInfo = getDateInfo(currentLine)
-            if dateInfo.hasDate {
-                let dateRange = NSRange(location: currentLineRange.location + dateInfo.dateRange.location,
-                                      length: dateInfo.dateRange.length)
-                replaceText(textView, range: dateRange, with: dateInfo.formattedDate + " ")
-                parent.text = textView.string
-                return
+            // 检查是否刚输入了空格或换行
+            let selectedRange = textView.selectedRange()
+            let lastChar = selectedRange.location > 0 ? (text as NSString).substring(with: NSRange(location: selectedRange.location - 1, length: 1)) : ""
+            let isAtLineEnd = lastChar == "\n"
+            
+            if lastChar == " " || isAtLineEnd {
+                // 检查并处理日期标记
+                let dateInfo = getDateInfo(currentLine.trimmingCharacters(in: .whitespaces))
+                if dateInfo.hasDate {
+                    // 找到当前行中的 @ 符号位置
+                    if let atSignRange = currentLine.range(of: "@") {
+                        let startOffset = currentLine.distance(from: currentLine.startIndex, to: atSignRange.lowerBound)
+                        let dateRange = NSRange(location: currentLineRange.location + startOffset,
+                                             length: dateInfo.dateRange.length)
+                        replaceText(textView, range: dateRange, with: dateInfo.formattedDate)
+                        if !isAtLineEnd {
+                            // 如果不是在行尾，添加空格
+                            replaceText(textView, range: NSRange(location: dateRange.location + dateInfo.formattedDate.count, length: 0), with: " ")
+                        }
+                        parent.text = textView.string
+                        applyMarkdownStyling(textView)
+                        return
+                    }
+                }
             }
             
             // 处理待办事项标记
@@ -260,7 +293,7 @@ struct MarkdownTextView: NSViewRepresentable {
                 self.lineHeaderLevels[currentLineNumber] = headerLevel
                 
                 // 如果输入了空格，则删除标题标记但保持样式
-                if let lastChar = currentLine.last, lastChar == " " {
+                if lastChar == " " {
                     let hashRange = NSRange(location: currentLineRange.location + headerInfo.hashRange.location,
                                          length: headerInfo.hashRange.length + 1)
                     replaceText(textView, range: hashRange, with: "")
@@ -294,6 +327,7 @@ struct MarkdownTextView: NSViewRepresentable {
             // 重置所有样式
             let fullRange = NSRange(location: 0, length: text.count)
             storage.removeAttribute(.font, range: fullRange)
+            storage.removeAttribute(.foregroundColor, range: fullRange)
             storage.addAttribute(.font, value: NSFont.systemFont(ofSize: 14), range: fullRange)
             
             // 遍历所有标题行并应用样式
@@ -306,6 +340,15 @@ struct MarkdownTextView: NSViewRepresentable {
                     
                     let line = (text as NSString).substring(with: lineRange)
                     print("Applied style - Line \(lineNumber): '\(line)' with level \(headerLevel)")
+                }
+            }
+            
+            // 为日期添加蓝色样式
+            let datePattern = "(\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{1,2},\\s+\\d{4}\\b)"
+            if let regex = try? NSRegularExpression(pattern: datePattern, options: [.caseInsensitive]) {
+                let matches = regex.matches(in: text, range: NSRange(location: 0, length: text.count))
+                for match in matches {
+                    storage.addAttribute(.foregroundColor, value: NSColor.systemBlue, range: match.range)
                 }
             }
             
