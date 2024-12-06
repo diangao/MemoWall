@@ -220,6 +220,16 @@ struct MarkdownTextView: NSViewRepresentable {
             
             print("Processing line \(currentLineNumber): '\(currentLine)'")
             
+            // Check if current line is empty and was previously a header
+            if currentLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if lineHeaderLevels[currentLineNumber] != nil {
+                    print("Removing header level for empty line \(currentLineNumber)")
+                    lineHeaderLevels.removeValue(forKey: currentLineNumber)
+                    applyMarkdownStyling(textView)
+                    return
+                }
+            }
+            
             // 检查并处理日期标记
             let dateInfo = getDateInfo(currentLine)
             if dateInfo.hasDate {
